@@ -1,5 +1,5 @@
 LIBS="-larmadillo"
-CFLAGS="-pg"
+CFLAGS=""
 INCLUDE="-I/usr/local/include/Minuit2"
 
 test: test.o
