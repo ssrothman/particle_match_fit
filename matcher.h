@@ -214,15 +214,16 @@ public:
     }
 
     arma::mat A;
-    double clipval;
-    double cutoff;
-    bool matchCharge;
     
-    unsigned maxReFit;
 
     arma::umat fitlocations;
 
     arma::vec globalGenPT, globalRecoPT;
+
+    double clipval;
+    double cutoff;
+    bool matchCharge;
+    unsigned maxReFit;
 
     std::vector<unsigned> recoToFit;
     std::vector<unsigned> genToFit;
