@@ -40,6 +40,8 @@ public:
         for(unsigned i=0; i<recovec.size(); ++i){
             globalRecoPT(i) = recovec[i].pt;
         }
+        globalGenPT/=arma::sum(globalGenPT);
+        globalRecoPT/=arma::sum(globalRecoPT);
     }
 
     arma::mat ptrans(){
@@ -199,7 +201,7 @@ public:
     std::vector<unsigned> getMatched(const particle& reco, 
                                      const std::vector<particle>& genvec) const {
         std::vector<unsigned> result;
-        double dR2thresh = cutoff*(square(reco.deta)+square(reco.dphi));
+        double dR2thresh = square(cutoff)*(square(reco.deta)+square(reco.dphi));
         for(unsigned i=0; i<genvec.size(); ++i){
             const particle& gen = genvec[i];
             if(matchCharge && (gen.charge != reco.charge)){
