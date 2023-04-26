@@ -15,6 +15,7 @@
 #include "simon_util_cpp/deltaR.h"
 #include "simon_util_cpp/util.h"
 
+#include "chisqLossFCN.h"
 
 using namespace ROOT::Minuit2;
 
