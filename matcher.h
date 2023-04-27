@@ -68,8 +68,8 @@ public:
         unsigned iIter=0;
         do {
             (*optimizer)();
-        } while(clipValues() && iIter++ < maxReFit); 
-        printf("Took %u iterations\n", iIter);
+        } while(clipValues() && ++iIter < maxReFit-1); 
+        //printf("Took %u iterations\n", iIter+1);
     }
 
     bool clipValues(){
