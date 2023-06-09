@@ -75,6 +75,7 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
     double operator()(const std::vector<double>& data) const override{
         arma::mat A = vecToMat(data);
         arma::rowvec denom = arma::sum(A,0);
+        denom.replace(0, 1);
         A.each_row() /= denom;
 
         double lossPT = 0;
