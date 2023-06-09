@@ -19,18 +19,28 @@
 
 using namespace ROOT::Minuit2;
 
+enum chargeMatchType{
+    sameCharge = 0,
+    anyCharge = 1,
+    agnostic = 2,
+    smart = 3
+};
+
 template <enum spatialLoss type=TYPE1>
 class matcher{
 public:
     explicit matcher(const std::vector<particle>& recovec, 
                      const std::vector<particle>& genvec,
-                     double clipval, double cutoff, bool matchCharge,
-                     unsigned maxReFit=50) :
+                     double clipval, double cutoff, int matchCharge,
+                     double jetCoreDR2, double softPt, double hardPt,
+                     unsigned maxReFit=50,
+                     double jetEta=9999999, double jetPhi=9999999) :
             A(recovec.size(), genvec.size(), arma::fill::zeros),
             globalGenPT(genvec.size()), globalRecoPT(recovec.size()),
             clipval(clipval), cutoff(cutoff), matchCharge(matchCharge),
+            jetCoreDR2(jetCoreDR2), softPt(softPt), hardPt(hardPt),
             maxReFit(maxReFit){
-        fitlocations = doPrefit(recovec, genvec);
+        fitlocations = doPrefit(recovec, genvec, jetEta, jetPhi);
         loss = buildLoss(recovec, genvec);
         optimizer = initializeOptimizer(recovec, genvec);
 
@@ -69,17 +79,27 @@ public:
         do {
             (*optimizer)();
         } while(clipValues() && ++iIter < maxReFit-1); 
-        //printf("Took %u iterations\n", iIter+1);
     }
 
     bool clipValues(){
         if(!optimizer){
             return false;
         }
-
         bool didanything = false;
+        arma::mat ans(A);
         for(unsigned i=0; i<fitlocations.n_rows; ++i){
-            double val = optimizer->Value(i);
+            unsigned x=fitlocations(i,0);
+            unsigned y=fitlocations(i,1);
+            ans(x, y) = optimizer->Value(i);
+        }
+        arma::vec colden = arma::sum(ans, 1);
+        colden.replace(0, 1);
+        ans.each_col() /= colden;
+
+        for(unsigned i=0; i<fitlocations.n_rows; ++i){
+            unsigned x=fitlocations(i,0);
+            unsigned y=fitlocations(i,1);
+            double val = ans(x, y);
             if(val < clipval){
                 optimizer->SetValue(i, 0);
                 optimizer->Fix(i);
@@ -160,7 +180,8 @@ public:
     }
 
     arma::umat doPrefit(const std::vector<particle>& recovec,
-                        const std::vector<particle>& genvec){
+                        const std::vector<particle>& genvec,
+                        const double& jetEta, const double& jetPhi){
 
         genToFit.clear();
         recoToFit.clear();
@@ -169,7 +190,7 @@ public:
         std::unordered_set<unsigned> genset;
         std::vector<std::pair<unsigned, unsigned>> locations;
         for(unsigned iReco=0; iReco<recovec.size(); ++iReco){
-            std::vector<unsigned> matched = getMatched(recovec[iReco], genvec);
+            std::vector<unsigned> matched = getMatched(recovec[iReco], genvec, jetEta, jetPhi);
             if(matched.size()==0){
             } else if(matched.size()==1){
                 A(iReco, matched[0]) = 1.0f;
@@ -199,13 +220,35 @@ public:
     }
 
     std::vector<unsigned> getMatched(const particle& reco, 
-                                     const std::vector<particle>& genvec) const {
+                                     const std::vector<particle>& genvec,
+                                     const double& jetEta,
+                                     const double& jetPhi) const {
         std::vector<unsigned> result;
         double dR2thresh = square(cutoff)*(square(reco.deta)+square(reco.dphi));
         for(unsigned i=0; i<genvec.size(); ++i){
             const particle& gen = genvec[i];
-            if(matchCharge && (gen.charge != reco.charge)){
-                continue;
+            switch(matchCharge){
+                case chargeMatchType::sameCharge:
+                    if(gen.charge != reco.charge){
+                        continue;
+                    }
+                    break;
+                case chargeMatchType::anyCharge:
+                    if(std::abs(gen.charge) != std::abs(reco.charge)){
+                        continue;
+                    }
+                    break;
+                case chargeMatchType::agnostic:
+                    break;
+                case smart:
+                    bool jetCore = dR2(reco.eta, reco.phi, jetEta, jetPhi) < jetCoreDR2;
+                    bool soft = reco.pt < softPt;
+                    bool hard = reco.pt > hardPt;
+                    bool requireMatch = !(jetCore || soft || hard);
+                    if(requireMatch && std::abs(gen.charge) != std::abs(reco.charge)){
+                        continue;
+                    }
+                    break;
             }
             double dist2 = dR2(reco.eta, reco.phi, gen.eta, gen.phi);
             if(dist2 > dR2thresh){
@@ -217,7 +260,6 @@ public:
     }
 
     arma::mat A;
-    
 
     arma::umat fitlocations;
 
@@ -225,7 +267,8 @@ public:
 
     double clipval;
     double cutoff;
-    bool matchCharge;
+    int matchCharge;
+    double jetCoreDR2, softPt, hardPt;
     unsigned maxReFit;
 
     std::vector<unsigned> recoToFit;
