@@ -13,7 +13,6 @@ enum spatialLoss{
     TYPE2=1  //weight the chisq difference between recoETA, genETA by transfer matrix
 };
 
-template <enum spatialLoss type>
 class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
   private:
     //data defining fit problem
@@ -29,6 +28,8 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
 
     const arma::umat locations;
 
+    const enum spatialLoss type;
+
   public:
     ChisqLossFCN() : 
         recoPT(1), recoETA(1), recoPHI(1),
@@ -37,7 +38,8 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         NPReco(1), NPGen(1),
         weightedGenETA(1), weightedGenPHI(1),
         PUexp(1), PUpenalty(1),
-        locations(1, 1){}
+        locations(1, 1),
+        type(TYPE1){}
 
     explicit ChisqLossFCN(const arma::vec& recoPT, 
                           const arma::vec& recoETA, 
@@ -50,7 +52,8 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
                           const arma::vec& errPHI,
                           const double PUexp, 
                           const double PUpenalty,
-                          const arma::umat& locations):
+                          const arma::umat& locations,
+                          const enum spatialLoss type):
       recoPT(recoPT), recoETA(recoETA), recoPHI(recoPHI),
       genPT(genPT), genETA(genETA), genPHI(genPHI),
       errPT(errPT), errETA(errETA), errPHI(errPHI),
@@ -58,7 +61,8 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
       weightedGenETA(genPT % genETA), 
       weightedGenPHI(genPT % genPHI),
       PUexp(PUexp), PUpenalty(PUpenalty),
-      locations(locations) {}
+      locations(locations),
+      type(type){}
 
     arma::mat vecToMat(const arma::vec& data) const{
         arma::mat result(NPReco, NPGen, arma::fill::zeros);
@@ -87,7 +91,7 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         arma::vec lossPTvec = (recoPT_pred - recoPT)/ errPT;
         lossPT = arma::dot(lossPTvec, lossPTvec);
 
-        if constexpr(type == spatialLoss::TYPE1){
+        if (type == spatialLoss::TYPE1){
             arma::vec recoETA_pred = A * weightedGenETA;
             recoETA_pred /= recoPT_pred;
             arma::vec lossETAvec = (recoETA_pred - recoETA)/ errETA;
@@ -97,7 +101,7 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
             recoPHI_pred /= recoPT_pred;
             arma::vec lossPHIvec = (recoPHI_pred - recoPHI)/ errPHI;
             lossPHI = arma::dot(lossPHIvec, lossPHIvec);
-        } else if constexpr(type == spatialLoss::TYPE2){
+        } else if (type == spatialLoss::TYPE2){
             arma::mat diffETA(NPReco, NPGen, arma::fill::none);
             diffETA.each_col() = recoETA;
             diffETA.each_row() -= arma::trans(genETA);

@@ -16,267 +16,139 @@
 #include "simon_util_cpp/util.h"
 
 #include "chisqLossFCN.h"
+#include "MatchingFilter.h"
+#include "ParticleUncertainty.h"
 
 using namespace ROOT::Minuit2;
 
-enum chargeMatchType{
-    sameCharge = 0,
-    anyCharge = 1,
-    agnostic = 2,
-    smart = 3
+enum class matchFilterType{
+    DR = 0,
+    CHARGESIGN = 1,
+    CHARGE = 2,
+    REALISTIC = 3
 };
 
-template <enum spatialLoss type=TYPE1>
+enum class uncertaintyType{
+    NAIVE = 0,
+    REALISTIC = 1
+};
+
 class matcher{
 public:
-    explicit matcher(const std::vector<particle>& recovec, 
-                     const std::vector<particle>& genvec,
-                     double clipval, double cutoff, int matchCharge,
-                     double jetCoreDR2, double softPt, double hardPt,
+    explicit matcher(const jet& recojet,
+                     const jet& genjet,
+
+                     double clipval, 
+
+                     enum spatialLoss loss,
+                     enum matchFilterType filter,
+                     enum uncertaintyType uncertainty,
+
+                     double cutoff, 
+
+                     double softPt=0, double hardPt=1e9,
+
+                     const std::vector<double>& EMstochastic = {}, 
+                     const std::vector<double>& EMnoise = {},
+                     const std::vector<double>& EMconstant = {},
+                     const std::vector<double>& ECALgranularity = {},
+                     const std::vector<double>& ECALEtaBoundaries = {},
+
+                     const std::vector<double>& HADstochastic = {},
+                     const std::vector<double>& HADconstant = {},
+                     const std::vector<double>& HCALgranularity = {},
+                     const std::vector<double>& HCALEtaBoundaries = {},
+
+                     const std::vector<double>& CHlinear = {},
+                     const std::vector<double>& CHconstant = {},
+                     const std::vector<double>& CHMS = {},
+                     const std::vector<double>& CHangular = {},
+                     const std::vector<double>& trkEtaBoundaries = {},
+
                      unsigned maxReFit=50,
-                     double jetEta=9999999, double jetPhi=9999999) :
-            A(recovec.size(), genvec.size(), arma::fill::zeros),
-            globalGenPT(genvec.size()), globalRecoPT(recovec.size()),
-            clipval(clipval), cutoff(cutoff), matchCharge(matchCharge),
-            jetCoreDR2(jetCoreDR2), softPt(softPt), hardPt(hardPt),
-            maxReFit(maxReFit){
-        fitlocations = doPrefit(recovec, genvec, jetEta, jetPhi);
-        loss = buildLoss(recovec, genvec);
-        optimizer = initializeOptimizer(recovec, genvec);
+                     int verbose=0) :
+            recojet_(recojet), genjet_(genjet),
+            clipval_(clipval), maxReFit_(maxReFit), 
+            verbose_(verbose), lossType_(loss) {
 
-        for(unsigned i=0; i<genvec.size(); ++i){
-            globalGenPT(i) = genvec[i].pt;
+        if (filter == matchFilterType::DR){
+            filter_ = std::make_unique<DRFilter>(cutoff);
+        } else if(filter == matchFilterType::CHARGE){
+            filter_ = std::make_unique<ChargeFilter>(cutoff);
+        } else if(filter == matchFilterType::CHARGESIGN){
+            filter_ = std::make_unique<ChargeSignFilter>(cutoff);
+        } else if(filter == matchFilterType::REALISTIC){
+            filter_ = std::make_unique<RealisticFilter>(cutoff, softPt, hardPt);
+        } else {
+            throw std::runtime_error("matcher: invalid filter type");
         }
-        for(unsigned i=0; i<recovec.size(); ++i){
-            globalRecoPT(i) = recovec[i].pt;
+
+        if(uncertainty == uncertaintyType::NAIVE){
+            uncertainty_ = std::make_unique<NaiveParticleUncertainty>();
+        } else if(uncertainty == uncertaintyType::REALISTIC){
+            uncertainty_ = std::make_unique<RealisticParticleUncertainty>(
+                EMstochastic,
+                EMnoise,
+                EMconstant,
+                ECALgranularity,
+                ECALEtaBoundaries,
+                HADstochastic,
+                HADconstant,
+                HCALgranularity,
+                HCALEtaBoundaries,
+                CHlinear,
+                CHconstant,
+                CHMS,
+                CHangular,
+                trkEtaBoundaries,
+                hardPt);
+        } else {
+            throw std::runtime_error("matcher: invalid uncertainty type");
         }
-        globalGenPT/=arma::sum(globalGenPT);
-        globalRecoPT/=arma::sum(globalRecoPT);
+
+        A_ = arma::mat(recojet.particles.size(), 
+                      genjet.particles.size(), 
+                      arma::fill::zeros);
+
+        doPrefit();
+        buildLoss();
+        initializeOptimizer();
     }
 
-    arma::mat ptrans(){
-        arma::mat ans(A);
-        for(unsigned i=0; i<fitlocations.n_rows; ++i){
-            unsigned x=fitlocations(i,0);
-            unsigned y=fitlocations(i,1);
-            ans(x, y) = optimizer->Value(i);
-        }
-        arma::vec colden = arma::sum(ans, 1);
-        colden.replace(0, 1);
-        ans.each_col() /= colden;
-        ans.each_col() %= globalRecoPT;
-        arma::rowvec rowden = arma::trans(globalGenPT)/arma::sum(globalGenPT);
-        rowden.replace(0, 1);
-        ans.each_row() /= rowden;
-        return ans;
-    }
+    arma::mat ptrans();
+    void killPU(arma::mat &ans); 
+    void minimize();
 
-    void minimize(){
-        if(!optimizer){
-            return;
-        }
-        unsigned iIter=0;
-        do {
-            (*optimizer)();
-        } while(clipValues() && ++iIter < maxReFit-1); 
-    }
+private:
+    bool clipValues();
+    void initializeOptimizer();
+    void buildLoss();
+    void doPrefit();
+    std::vector<unsigned> getMatched(particle& reco); 
+    
+    jet recojet_, genjet_;
 
-    bool clipValues(){
-        if(!optimizer){
-            return false;
-        }
-        bool didanything = false;
-        arma::mat ans(A);
-        for(unsigned i=0; i<fitlocations.n_rows; ++i){
-            unsigned x=fitlocations(i,0);
-            unsigned y=fitlocations(i,1);
-            ans(x, y) = optimizer->Value(i);
-        }
-        arma::vec colden = arma::sum(ans, 1);
-        colden.replace(0, 1);
-        ans.each_col() /= colden;
+    arma::mat A_;
+    arma::umat fitlocations_;
 
-        for(unsigned i=0; i<fitlocations.n_rows; ++i){
-            unsigned x=fitlocations(i,0);
-            unsigned y=fitlocations(i,1);
-            double val = ans(x, y);
-            if(val < clipval){
-                optimizer->SetValue(i, 0);
-                optimizer->Fix(i);
-                didanything = true;
-            }
-        }
-        return didanything;
-    }
+    double clipval_;
 
-    std::unique_ptr<MnMigrad> initializeOptimizer(const std::vector<particle>& recovec,
-                                                  const std::vector<particle>& genvec){
-        if(!loss){
-            return nullptr;
-        }
-        MnUserParameters starting;
-        char buffer[4];
-        for(unsigned i=0; i<fitlocations.n_rows; ++i){
-            sprintf(buffer, "%u", i);
-            starting.Add(buffer, 1.0, 1.0);
-            starting.SetLowerLimit(buffer, 0.0);
-        }
-        return std::make_unique<MnMigrad>(*loss, starting); 
-    }
+    std::unique_ptr<ParticleUncertainty> uncertainty_;
+    std::unique_ptr<MatchingFilter> filter_;
+
+    unsigned maxReFit_;
+
+    std::vector<unsigned> recoToFit_;
+    std::vector<unsigned> genToFit_;
+
+    std::unique_ptr<ChisqLossFCN> loss_;
+    std::unique_ptr<MnMigrad> optimizer_;
+
+    int verbose_;
+
+    enum spatialLoss lossType_;
 
 
-    std::unique_ptr<ChisqLossFCN<type>> buildLoss(const std::vector<particle>& recovec,
-                                 const std::vector<particle>& genvec){
-        if(fitlocations.n_rows==0){
-            return nullptr;
-        }
-        std::unordered_map<unsigned, unsigned> recoIdxMap;
-        arma::vec recoPT(recoToFit.size(), arma::fill::none);
-        arma::vec recoETA(recoToFit.size(), arma::fill::none);
-        arma::vec recoPHI(recoToFit.size(), arma::fill::none);
-        arma::vec errPT(recoToFit.size(), arma::fill::none);
-        arma::vec errETA(recoToFit.size(), arma::fill::none);
-        arma::vec errPHI(recoToFit.size(), arma::fill::none);
-        for(unsigned i=0; i<recoToFit.size(); ++i){
-            unsigned idx =recoToFit[i];
-            recoIdxMap[idx] = i;
-
-            const particle& part = recovec[idx];
-            recoPT[i] = part.pt;
-            recoETA[i] = part.eta;
-            recoPHI[i] = part.phi;
-            errPT[i] = part.dpt;
-            errETA[i] = part.deta;
-            errPHI[i] = part.dphi;
-
-        }
-
-        std::unordered_map<unsigned, unsigned> genIdxMap;
-        arma::vec genPT(genToFit.size(), arma::fill::none);
-        arma::vec genETA(genToFit.size(), arma::fill::none);
-        arma::vec genPHI(genToFit.size(), arma::fill::none);
-        for(unsigned i=0; i<genToFit.size(); ++i){
-            unsigned idx =genToFit[i];
-            genIdxMap[idx] = i;
-
-            const particle& part = genvec[idx];
-            genPT[i] = part.pt;
-            genETA[i] = part.eta;
-            genPHI[i] = part.phi;
-        }
-
-        arma::umat locations(fitlocations.n_rows, 2u, arma::fill::none);
-        for(unsigned i=0; i<fitlocations.n_rows; ++i){
-            locations(i, 0) = recoIdxMap[fitlocations(i, 0)];
-            locations(i, 1) = genIdxMap[fitlocations(i, 1)];
-        }
-
-        return std::make_unique<ChisqLossFCN<type>>(
-                                  recoPT, recoETA, recoPHI,
-                                  genPT, genETA, genPHI,
-                                  errPT, errETA, errPHI,
-                                  0.0, 0.0,
-                                  locations);
-    }
-
-    arma::umat doPrefit(const std::vector<particle>& recovec,
-                        const std::vector<particle>& genvec,
-                        const double& jetEta, const double& jetPhi){
-
-        genToFit.clear();
-        recoToFit.clear();
-        A.fill(0);
-
-        std::unordered_set<unsigned> genset;
-        std::vector<std::pair<unsigned, unsigned>> locations;
-        for(unsigned iReco=0; iReco<recovec.size(); ++iReco){
-            std::vector<unsigned> matched = getMatched(recovec[iReco], genvec, jetEta, jetPhi);
-            if(matched.size()==0){
-            } else if(matched.size()==1){
-                A(iReco, matched[0]) = 1.0f;
-            } else{
-                //keep track of which gen&reco particles 
-                //will need to be passed to the fitter
-                recoToFit.emplace_back(iReco);
-                genset.insert(matched.begin(), matched.end());
-
-                //keep track of where the fit parameters 
-                //will fit into the larger matrix
-                for(unsigned i=0; i<matched.size(); ++i){
-                    locations.emplace_back(iReco, matched[i]);
-                }
-            }
-        }
-        genToFit.insert(genToFit.end(), genset.begin(), genset.end());
-        std::sort(genToFit.begin(), genToFit.end());
-
-        arma::umat result(locations.size(), 2u, arma::fill::none);
-        for(unsigned i=0; i<locations.size(); ++i){
-            const auto& loc = locations[i];
-            result(i, 0) = loc.first;
-            result(i, 1) = loc.second;
-        }
-        return result;
-    }
-
-    std::vector<unsigned> getMatched(const particle& reco, 
-                                     const std::vector<particle>& genvec,
-                                     const double& jetEta,
-                                     const double& jetPhi) const {
-        std::vector<unsigned> result;
-        double dR2thresh = square(cutoff)*(square(reco.deta)+square(reco.dphi));
-        for(unsigned i=0; i<genvec.size(); ++i){
-            const particle& gen = genvec[i];
-            switch(matchCharge){
-                case chargeMatchType::sameCharge:
-                    if(gen.charge != reco.charge){
-                        continue;
-                    }
-                    break;
-                case chargeMatchType::anyCharge:
-                    if(std::abs(gen.charge) != std::abs(reco.charge)){
-                        continue;
-                    }
-                    break;
-                case chargeMatchType::agnostic:
-                    break;
-                case smart:
-                    bool jetCore = dR2(reco.eta, reco.phi, jetEta, jetPhi) < jetCoreDR2;
-                    bool soft = reco.pt < softPt;
-                    bool hard = reco.pt > hardPt;
-                    bool requireMatch = !(jetCore || soft || hard);
-                    if(requireMatch && std::abs(gen.charge) != std::abs(reco.charge)){
-                        continue;
-                    }
-                    break;
-            }
-            double dist2 = dR2(reco.eta, reco.phi, gen.eta, gen.phi);
-            if(dist2 > dR2thresh){
-                continue;
-            }
-            result.emplace_back(i);
-        }
-        return result;
-    }
-
-    arma::mat A;
-
-    arma::umat fitlocations;
-
-    arma::vec globalGenPT, globalRecoPT;
-
-    double clipval;
-    double cutoff;
-    int matchCharge;
-    double jetCoreDR2, softPt, hardPt;
-    unsigned maxReFit;
-
-    std::vector<unsigned> recoToFit;
-    std::vector<unsigned> genToFit;
-
-    std::unique_ptr<ChisqLossFCN<type>> loss;
-
-    std::unique_ptr<MnMigrad> optimizer;
 };
 
 #endif
