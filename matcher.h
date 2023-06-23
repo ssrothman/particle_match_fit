@@ -29,7 +29,8 @@ enum class matchFilterType{
 
 enum class uncertaintyType{
     NAIVE = 0,
-    REALISTIC = 1
+    STANDARD = 1,
+    SMEAREDTRACKS = 2
 };
 
 class matcher{
@@ -65,7 +66,9 @@ public:
                      const std::vector<double>& trkEtaBoundaries = {},
 
                      unsigned maxReFit=50,
-                     int verbose=0) :
+                     int verbose=0,
+
+                     const matcher *const previous=nullptr) :
             recojet_(recojet), genjet_(genjet),
             clipval_(clipval), maxReFit_(maxReFit), 
             verbose_(verbose), lossType_(loss) {
@@ -84,8 +87,8 @@ public:
 
         if(uncertainty == uncertaintyType::NAIVE){
             uncertainty_ = std::make_unique<NaiveParticleUncertainty>();
-        } else if(uncertainty == uncertaintyType::REALISTIC){
-            uncertainty_ = std::make_unique<RealisticParticleUncertainty>(
+        } else if(uncertainty == uncertaintyType::STANDARD){
+            uncertainty_ = std::make_unique<StandardParticleUncertainty>(
                 EMstochastic,
                 EMnoise,
                 EMconstant,
@@ -99,17 +102,30 @@ public:
                 CHconstant,
                 CHMS,
                 CHangular,
-                trkEtaBoundaries,
-                hardPt);
+                trkEtaBoundaries);
+        } else if (uncertainty == uncertaintyType::SMEAREDTRACKS){
+            uncertainty_ = std::make_unique<StandardParticleUncertaintySmearedTracks>(
+                EMstochastic,
+                EMnoise,
+                EMconstant,
+                ECALgranularity,
+                ECALEtaBoundaries,
+                HADstochastic,
+                HADconstant,
+                HCALgranularity,
+                HCALEtaBoundaries,
+                CHlinear,
+                CHconstant,
+                CHMS,
+                CHangular,
+                trkEtaBoundaries);
         } else {
             throw std::runtime_error("matcher: invalid uncertainty type");
         }
 
-        A_ = arma::mat(recojet.particles.size(), 
-                      genjet.particles.size(), 
-                      arma::fill::zeros);
-
-        doPrefit();
+        clear();
+        fillUncertainties();
+        doPrefit(previous);
         buildLoss();
         initializeOptimizer();
     }
@@ -118,12 +134,18 @@ public:
     void killPU(arma::mat &ans); 
     void minimize();
 
+    const arma::mat A() const;
+
 private:
+    void clear();
+    void fillUncertainties();
+
+    void doPrefit(const matcher *const previous=nullptr);
+
     bool clipValues();
     void initializeOptimizer();
     void buildLoss();
-    void doPrefit();
-    std::vector<unsigned> getMatched(particle& reco); 
+    void usePreviousFit(const matcher& previous);
     
     jet recojet_, genjet_;
 

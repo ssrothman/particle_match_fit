@@ -18,6 +18,7 @@ class NaiveParticleUncertainty : public ParticleUncertainty {
         void addUncertainty(particle& part, const jet& j) override;
 };
 
+
 class RealisticParticleUncertainty : public ParticleUncertainty{
     /*
      * Attempt to emulate something realistic in CMS
@@ -33,13 +34,6 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
      * For charged particles, resolutions are determined by tracker
      *   sigma(pT)/pT = A*pT + B
      *   sigma(phi) = sigma(eta) = C/pT + D
-     *
-     * NB resolutions are treated to be constant as a function of eta within the tracker volume
-     *  This is a pretty bad assumption, and might need to be updated
-     *
-     * Additionally, we take into account poor tracking performance at high pT, which is particularly seen in jets
-     * if the particle has pt > hardPt_ then we revert to calorimeter resolutions 
-     * NB muons are excepted from this, as they are not calorimeter objects at all
      */
     public:
         RealisticParticleUncertainty(
@@ -56,9 +50,7 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
                 const std::vector<double>& CHconstant,
                 const std::vector<double>& CHMS,
                 const std::vector<double>& CHangular,
-                const std::vector<double>& trkEtaBoundaries,
-                double hardPt
-                ) :
+                const std::vector<double>& trkEtaBoundaries) :
             EMstochastic_(EMstochastic),
             EMnoise_(EMnoise),
             EMconstant_(EMconstant),
@@ -72,16 +64,11 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
             CHconstant_(CHconstant),
             CHMS_(CHMS),
             CHangular_(CHangular),
-            trkEtaBoundaries_(trkEtaBoundaries),
-            hardPt_(hardPt) {}
-        ~RealisticParticleUncertainty() override {};
-        void addUncertainty(particle& part, const jet& j) override;
-    private:
+            trkEtaBoundaries_(trkEtaBoundaries) {}
+    protected:
         void addUncertaintyToNeutralEM(particle& part);
         void addUncertaintyToNeutralHadron(particle& part);
         void addUncertaintyToCharged(particle& part);
-
-        int getEtaRegion(double eta, const std::vector<double>& boundaries);
 
         std::vector<double> EMstochastic_, EMnoise_, EMconstant_;
         std::vector<double> ECALgranularity_;
@@ -94,8 +81,64 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
         std::vector<double> CHlinear_, CHconstant_;
         std::vector<double> CHMS_, CHangular_;
         std::vector<double> trkEtaBoundaries_;
+};
 
-        double hardPt_;
+class StandardParticleUncertainty : public RealisticParticleUncertainty {
+    public:
+        StandardParticleUncertainty(
+                const std::vector<double>& EMstochastic,
+                const std::vector<double>& EMnoise,
+                const std::vector<double>& EMconstant,
+                const std::vector<double>& ECALgranularity,
+                const std::vector<double>& ECALEtaBoundaries,
+                const std::vector<double>& HADstochastic,
+                const std::vector<double>& HADconstant,
+                const std::vector<double>& HCALgranularity,
+                const std::vector<double>& HCALEtaBoundaries,
+                const std::vector<double>& CHlinear,
+                const std::vector<double>& CHconstant,
+                const std::vector<double>& CHMS,
+                const std::vector<double>& CHangular,
+                const std::vector<double>& trkEtaBoundaries) :
+            RealisticParticleUncertainty(
+                    EMstochastic, EMnoise, EMconstant,
+                    ECALgranularity, ECALEtaBoundaries, 
+                    HADstochastic, HADconstant, 
+                    HCALgranularity, HCALEtaBoundaries,
+                    CHlinear, CHconstant, 
+                    CHMS, CHangular,
+                    trkEtaBoundaries) {}
+        ~StandardParticleUncertainty() override {}
+        void addUncertainty(particle& part, const jet& j) override;
+};
+
+class StandardParticleUncertaintySmearedTracks : public RealisticParticleUncertainty {
+    public:
+        StandardParticleUncertaintySmearedTracks(
+                const std::vector<double>& EMstochastic,
+                const std::vector<double>& EMnoise,
+                const std::vector<double>& EMconstant,
+                const std::vector<double>& ECALgranularity,
+                const std::vector<double>& ECALEtaBoundaries,
+                const std::vector<double>& HADstochastic,
+                const std::vector<double>& HADconstant,
+                const std::vector<double>& HCALgranularity,
+                const std::vector<double>& HCALEtaBoundaries,
+                const std::vector<double>& CHlinear,
+                const std::vector<double>& CHconstant,
+                const std::vector<double>& CHMS,
+                const std::vector<double>& CHangular,
+                const std::vector<double>& trkEtaBoundaries) :
+            RealisticParticleUncertainty(
+                    EMstochastic, EMnoise, EMconstant,
+                    ECALgranularity, ECALEtaBoundaries, 
+                    HADstochastic, HADconstant, 
+                    HCALgranularity, HCALEtaBoundaries,
+                    CHlinear, CHconstant, 
+                    CHMS, CHangular,
+                    trkEtaBoundaries) {}
+        ~StandardParticleUncertaintySmearedTracks() override {}
+        void addUncertainty(particle& part, const jet& j) override;
 };
 
 #endif

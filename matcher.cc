@@ -38,7 +38,6 @@ arma::mat matcher::ptrans(){
         printf("RECO\n");
         std::cout << (recojet_.ptvec()).t();
     }
-
     return ans;
 }
 
@@ -75,56 +74,108 @@ void matcher::killPU(arma::mat& ans){
     }*/
 }
 
-void matcher::minimize(){
-    if(!optimizer_){
-        return;
-    }
-    unsigned iIter=0;
-    do {
-        (*optimizer_)();
-    } while(clipValues() && ++iIter < maxReFit_-1); 
-}
-
-bool matcher::clipValues(){
-    if(!optimizer_){
-        return false;
-    }
-    bool didanything = false;
+const arma::mat matcher::A() const{
     arma::mat ans(A_);
-    for(unsigned i=0; i<fitlocations_.n_rows; ++i){
-        unsigned x=fitlocations_(i,0);
-        unsigned y=fitlocations_(i,1);
+    for (unsigned i = 0; i < fitlocations_.n_rows; ++i){
+        unsigned x = fitlocations_(i, 0);
+        unsigned y = fitlocations_(i, 1);
         ans(x, y) = optimizer_->Value(i);
     }
-    arma::vec colden = arma::sum(ans, 1);
-    colden.replace(0, 1);
-    ans.each_col() /= colden;
-
-    for(unsigned i=0; i<fitlocations_.n_rows; ++i){
-        unsigned x=fitlocations_(i,0);
-        unsigned y=fitlocations_(i,1);
-        double val = ans(x, y);
-        if(val < clipval_){
-            optimizer_->SetValue(i, 0);
-            optimizer_->Fix(i);
-            didanything = true;
-        }
-    }
-    return didanything;
+    return ans;
 }
 
-void matcher::initializeOptimizer(){
-    if(!loss_){
-        return;
+void matcher::clear(){
+    genToFit_.clear();
+    recoToFit_.clear();
+    A_ = arma::mat(recojet_.particles.size(), 
+                  genjet_.particles.size(), 
+                  arma::fill::zeros);
+}
+
+void matcher::fillUncertainties(){
+    for(particle& p : recojet_.particles){
+        uncertainty_->addUncertainty(p, recojet_); 
     }
-    MnUserParameters starting;
-    char buffer[4];
-    for(unsigned i=0; i<fitlocations_.n_rows; ++i){
-        sprintf(buffer, "%u", i);
-        starting.Add(buffer, 1.0, 1.0);
-        starting.SetLowerLimit(buffer, 0.0);
+}
+
+void matcher::doPrefit(const matcher* const previous){
+                       
+    std::vector<unsigned>& floatingGen;
+    std::vector<unsigned>& fixedGen;
+    if(previous){
+        A_ = previous->A();
+        for(unsigned iGen=0; iGen<genjet_.nPart; ++iGen){
+            if(arma::accu(A_.col(iGen)) == 0){
+                floatingGen.emplace_back(iGen);
+            } else {
+                fixedGen.emplace_back(iGen);
+            }
+        }
+    } else {
+        floatingGen.resize(genjet_.nPart);
+        std::iota(floatingGen.begin(), floatingGen.end(), 0);
     }
-    optimizer_ = std::make_unique<MnMigrad>(*loss_, starting); 
+
+    std::unordered_set<unsigned> fittingReco, fittingGen;
+    std::vector<std::pair<unsigned, unsigned>> toFit, fixedInFit;
+    for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){//foreach reco particle
+        particle& reco = recojet_.particles[iReco];
+        std::vector<unsigned> matchedgen;
+        for(unsigned iGen : floatingGen){//foreach floating gen particle
+            particle& gen = genjet_.particles[iGen];
+            if(filter_->pass(reco, gen)){//if matching is allowed
+                matchedgen.emplace_back(iGen);
+            }//end if matching
+        }//end foreach gen
+        if(matchedgen.size() == 0){//if no gen particles match
+            continue;
+        } else if(matchedgen.size() == 1){//if exactly one match
+            A_(iReco, matchedgen[0]) = 1;
+        } else {//need to fit
+            for(unsigned iGen : matchedgen){
+                toFit.emplace_back(iReco, iGen);
+                fittingReco.insert(iReco);
+                fittingGen.insert(iGen);
+            }
+            for(unsigned iGen : fixedGen){
+                if(A_(iReco, iGen)){
+                    fixedInFit.emplace_back(iReco, iGen);
+                    fittingReco.insert(iReco);
+                    fittingGen.insert(iGen);
+                }
+            }
+        }//end switch(matchedgen.size())
+    }//end foreach reco
+
+    genToFit_.clear();
+    genToFit_.reserve(fittingGen.size());
+    genToFit_.insert(genToFit_.end(), fittingGen.begin(), 
+                                      fittingGen.end());
+    recoToFit_.clear();
+    recoToFit_.reserve(fittingReco.size());
+    recoToFit_.insert(recoToFit_.end(), fittingReco.begin(), 
+                                        fittingReco.end());
+
+    fitlocations_ = arma::umat(toFit.size(), 2, arma::fill::none);
+    for(unsigned i=0; i<toFit.size(); ++i){
+        fitlocations_(i, 0) = toFit[i].first;
+        fitlocations_(i, 1) = toFit[i].second;
+    }
+
+    if(verbose_){
+        if(previous){
+            printf("from previous:\n");
+            std::cout << previous->A() << std::endl;
+        }
+        printf("fixed by prefit:");
+        std::cout << A_ << std::endl;
+        arma::mat Q = arma::mat(A_.n_rows, A_.n_cols, arma::fill::zeros);
+        for(auto& p : toFit){
+            Q(p.first, p.second) = 1;
+        }
+        printf("floating by prefit:");
+        std::cout << Q << std::endl;
+    }
 }
 
 void matcher::buildLoss(){
@@ -175,79 +226,57 @@ void matcher::buildLoss(){
         recoPT, recoETA, recoPHI,
         genPT, genETA, genPHI,
         errPT, errETA, errPHI,
-        0.0, 0.0,
         locations, lossType_);
 }
 
-void matcher::doPrefit(){
-    genToFit_.clear();
-    recoToFit_.clear();
-    A_.fill(0);
-
-    std::unordered_set<unsigned> genset;
-    std::vector<std::pair<unsigned, unsigned>> locations;
-    for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
-        std::vector<unsigned> matched = getMatched(recojet_.particles[iReco]);
-        if(matched.size()==0){
-        } else if(matched.size()==1){
-            A_(iReco, matched[0]) = 1.0f;
-        } else{
-            //keep track of which gen&reco particles 
-            //will need to be passed to the fitter
-            recoToFit_.emplace_back(iReco);
-            genset.insert(matched.begin(), matched.end());
-
-            //keep track of where the fit parameters 
-            //will fit into the larger matrix
-            for(unsigned i=0; i<matched.size(); ++i){
-                locations.emplace_back(iReco, matched[i]);
-            }
-        }
+void matcher::initializeOptimizer(){
+    if(!loss_){
+        return;
     }
-    genToFit_.insert(genToFit_.end(), genset.begin(), genset.end());
-    std::sort(genToFit_.begin(), genToFit_.end());
-
-    fitlocations_=arma::umat(locations.size(), 2u, arma::fill::none);
-    for(unsigned i=0; i<locations.size(); ++i){
-        const auto& loc = locations[i];
-        fitlocations_(i, 0) = loc.first;
-        fitlocations_(i, 1) = loc.second;
+    MnUserParameters starting;
+    char buffer[4];
+    for(unsigned i=0; i<fitlocations_.n_rows; ++i){
+        sprintf(buffer, "%u", i);
+        starting.Add(buffer, 1.0, 1.0);
+        starting.SetLowerLimit(buffer, 0.0);
     }
-    if(verbose_){
-        printf("\nprefit fixed matches:\n");
-        std::cout << A_ << std::endl;
-        printf("\nprefit floating matches:\n");
-        arma::mat Q = arma::zeros<arma::mat>(recojet_.particles.size(), genjet_.particles.size());
-        for(unsigned i=0; i<fitlocations_.n_rows; ++i){
-            unsigned x=fitlocations_(i,0);
-            unsigned y=fitlocations_(i,1);
-            Q(x,y) = 1;
-        }
-        std::cout << Q << std::endl;
-    }
+    optimizer_ = std::make_unique<MnMigrad>(*loss_, starting); 
 }
 
-std::vector<unsigned> matcher::getMatched(particle& reco){
-    uncertainty_->addUncertainty(reco, recojet_);
-
-    std::vector<unsigned> result;
-
-    if (verbose_>1){
-        printf("searching for matches for reco (%0.3f, %0.3f, %0.3f)\n", reco.pt, reco.eta, reco.phi);
+void matcher::minimize(){
+    if(!optimizer_){
+        return;
     }
-    for(unsigned i=0; i<genjet_.particles.size(); ++i){
-        const particle& gen = genjet_.particles[i];
-        if(filter_->allowMatch(reco, gen, recojet_)){
-            result.emplace_back(i);
-            if(verbose_>1){
-                printf("\tPASS (%0.3f, %0.3f, %0.3f)\n", gen.pt, gen.eta, gen.phi);
-            }
-        } else {
-            if(verbose_>1){
-                printf("\tFAIL (%0.3f, %0.3f, %0.3f)\n", gen.pt, gen.eta, gen.phi);
-            }
-        }
-    }
-    return result;
+    unsigned iIter=0;
+    do {
+        (*optimizer_)();
+    } while(clipValues() && ++iIter < maxReFit_-1); 
 }
 
+bool matcher::clipValues(){
+    if(!optimizer_){
+        return false;
+    }
+    bool didanything = false;
+    arma::mat ans(A_);
+    for(unsigned i=0; i<fitlocations_.n_rows; ++i){
+        unsigned x=fitlocations_(i,0);
+        unsigned y=fitlocations_(i,1);
+        ans(x, y) = optimizer_->Value(i);
+    }
+    arma::vec colden = arma::sum(ans, 1);
+    colden.replace(0, 1);
+    ans.each_col() /= colden;
+
+    for(unsigned i=0; i<fitlocations_.n_rows; ++i){
+        unsigned x=fitlocations_(i,0);
+        unsigned y=fitlocations_(i,1);
+        double val = ans(x, y);
+        if(val < clipval_){
+            optimizer_->SetValue(i, 0);
+            optimizer_->Fix(i);
+            didanything = true;
+        }
+    }
+    return didanything;
+}

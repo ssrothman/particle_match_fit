@@ -22,8 +22,6 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
 
     const arma::vec weightedGenETA, weightedGenPHI;
 
-    const double PUexp, PUpenalty;
-
     const arma::umat locations;
 
     const enum spatialLoss type;
@@ -35,7 +33,6 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         errPT(1), errETA(1), errPHI(1),
         NPReco(1), NPGen(1),
         weightedGenETA(1), weightedGenPHI(1),
-        PUexp(1), PUpenalty(1),
         locations(1, 1),
         type(TYPE1){}
 
@@ -48,8 +45,6 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
                           const arma::vec& errPT, 
                           const arma::vec& errETA,
                           const arma::vec& errPHI,
-                          const double PUexp, 
-                          const double PUpenalty,
                           const arma::umat& locations,
                           const enum spatialLoss type):
       recoPT(recoPT), recoETA(recoETA), recoPHI(recoPHI),
@@ -58,7 +53,6 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
       NPReco(recoPT.size()), NPGen(genPT.size()),
       weightedGenETA(genPT % genETA), 
       weightedGenPHI(genPT % genPHI),
-      PUexp(PUexp), PUpenalty(PUpenalty),
       locations(locations),
       type(type){}
 
