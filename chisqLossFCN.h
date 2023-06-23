@@ -5,8 +5,6 @@
 #include <vector>
 #include <memory>
 #include <armadillo>
-#include "toyjets/gen.h"
-#include "toyjets/gaus.h"
 
 enum spatialLoss{
     TYPE1=0, //construct pT-weighted predicted pT, eta. Use in classic chisq loss

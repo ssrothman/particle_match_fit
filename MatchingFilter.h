@@ -1,7 +1,7 @@
 #ifndef MATCHING_MATCHINGFILTER_H
 #define MATCHING_MATCHINGFILTER_H
 
-#include "SRothman/Matching/src/toyjets/common.h"
+#include "SRothman/SimonTools/src/jets.h"
 
 class MatchingFilter{
     public:

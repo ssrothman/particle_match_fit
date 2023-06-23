@@ -10,8 +10,7 @@
 #include <Minuit2/MnMigrad.h>
 #include <Minuit2/FunctionMinimum.h>
 
-#include "toyjets/common.h"
-
+#include "SRothman/SimonTools/src/jets.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "SRothman/SimonTools/src/util.h"
 

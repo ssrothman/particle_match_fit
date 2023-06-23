@@ -13,8 +13,8 @@ arma::mat matcher::ptrans(){
     colden.replace(0, 1);
     ans.each_col() /= colden;
 
-    arma::vec genpt = get_jet_pts(genjet_);
-    arma::vec recpt = get_jet_pts(recojet_);
+    arma::vec genpt = genjet_.ptvec();
+    arma::vec recpt = recojet_.ptvec();
     genpt/=arma::accu(genpt);
     recpt/=arma::accu(recpt);
 
@@ -32,11 +32,11 @@ arma::mat matcher::ptrans(){
         printf("ptrans:\n");
         std::cout << ans;
         printf("GEN\n");
-        std::cout << get_jet_pts(genjet_).t();
+        std::cout << genjet_.ptvec().t();
         printf("ptrans * GEN\n");
-        std::cout << (ans * get_jet_pts(genjet_)).t();
+        std::cout << (ans * genjet_.ptvec()).t();
         printf("RECO\n");
-        std::cout << get_jet_pts(recojet_).t();
+        std::cout << (recojet_.ptvec()).t();
     }
 
     return ans;

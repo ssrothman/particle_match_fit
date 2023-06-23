@@ -1,7 +1,7 @@
 #ifndef MATCHING_PARTICLEUNCERTAINTY_H
 #define MATCHING_PARTICLEUNCERTAINTY_H
 
-#include "SRothman/Matching/src/toyjets/common.h"
+#include "SRothman/SimonTools/src/jets.h"
 #include <vector>
 
 class ParticleUncertainty{
