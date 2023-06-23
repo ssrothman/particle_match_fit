@@ -12,8 +12,8 @@
 
 #include "toyjets/common.h"
 
-#include "simon_util_cpp/deltaR.h"
-#include "simon_util_cpp/util.h"
+#include "SRothman/SimonTools/src/deltaR.h"
+#include "SRothman/SimonTools/src/util.h"
 
 #include "chisqLossFCN.h"
 #include "MatchingFilter.h"

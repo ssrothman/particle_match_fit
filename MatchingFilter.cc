@@ -1,5 +1,5 @@
 #include "SRothman/Matching/src/MatchingFilter.h"
-#include "simon_util_cpp/deltaR.h"
+#include "SRothman/SimonTools/src/deltaR.h"
 
 bool MatchingFilter::passDR(const particle& part1, const particle& part2, const jet& j){
     double dR = std::sqrt(dR2(part1.eta,part1.phi, part2.eta,part2.phi));

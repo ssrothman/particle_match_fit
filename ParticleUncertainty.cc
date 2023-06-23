@@ -1,5 +1,5 @@
 #include "ParticleUncertainty.h"
-#include "SRothman/Matching/src/simon_util_cpp/util.h"
+#include "SRothman/SimonTools/src/util.h"
 
 
 void NaiveParticleUncertainty::addUncertainty(particle& part, const jet& j){
