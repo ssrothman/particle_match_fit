@@ -24,7 +24,8 @@ enum class matchFilterType{
     DR = 0,
     CHARGESIGN = 1,
     CHARGE = 2,
-    REALISTIC = 3
+    REALISTIC = 3,
+    LOSTTRACK = 4
 };
 
 enum class uncertaintyType{
@@ -150,7 +151,7 @@ private:
     jet recojet_, genjet_;
 
     arma::mat A_;
-    arma::umat fitlocations_;
+    std::vector<std::pair<unsigned, unsigned>> fitlocations_;
 
     double clipval_;
 
@@ -158,9 +159,6 @@ private:
     std::unique_ptr<MatchingFilter> filter_;
 
     unsigned maxReFit_;
-
-    std::vector<unsigned> recoToFit_;
-    std::vector<unsigned> genToFit_;
 
     std::unique_ptr<ChisqLossFCN> loss_;
     std::unique_ptr<MnMigrad> optimizer_;

@@ -48,4 +48,12 @@ class RealisticFilter : public MatchingFilter {
         double softPt_, hardPt_;
 };
 
+class LostTrackFilter : public MatchingFilter {
+    public:
+        LostTrackFilter(double threshold):
+            MatchingFilter(threshold) {}
+        ~LostTrackFilter() override {};
+        bool allowMatch(const particle& part1, const particle& part2, const jet& j) override;
+};
+
 #endif
