@@ -7,11 +7,11 @@ class MatchingFilter{
     public:
         MatchingFilter(double threshold) : threshold_(threshold) {};
         virtual ~MatchingFilter(){};
-        virtual bool allowMatch(const particle& part1, const particle& part2, const jet& j) = 0;
+        virtual bool allowMatch(const particle& reco, const particle& gen, const jet& j) = 0;
     protected:
-        bool passDR(const particle& part1, const particle& part2, const jet& j);
-        bool sameCharge(const particle& part1, const particle& part2, const jet& j);
-        bool sameChargeSign(const particle& part1, const particle& part2, const jet& j);
+        bool passDR(const particle& reco, const particle& gen, const jet& j);
+        bool sameCharge(const particle& reco, const particle& gen, const jet& j);
+        bool sameChargeSign(const particle& reco, const particle& gen, const jet& j);
     private:
         double threshold_;
 };
@@ -20,21 +20,21 @@ class DRFilter : public MatchingFilter {
     public:
         DRFilter(double threshold) : MatchingFilter(threshold) {}
         ~DRFilter() override {};
-        bool allowMatch(const particle& part1, const particle& part2, const jet& j) override;
+        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
 };
 
 class ChargeSignFilter : public MatchingFilter {
     public:
         ChargeSignFilter(double threshold) : MatchingFilter(threshold) {};
         ~ChargeSignFilter() override {};
-        bool allowMatch(const particle& part1, const particle& part2, const jet& j) override;
+        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
 };
 
 class ChargeFilter : public MatchingFilter {
     public:
         ChargeFilter(double threshold) : MatchingFilter(threshold) {};
         ~ChargeFilter() override {};
-        bool allowMatch(const particle& part1, const particle& part2, const jet& j) override;
+        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
 };
 
 class RealisticFilter : public MatchingFilter {
@@ -43,7 +43,7 @@ class RealisticFilter : public MatchingFilter {
             MatchingFilter(threshold),
             softPt_(softPt), hardPt_(hardPt) {};
         ~RealisticFilter() override {};
-        bool allowMatch(const particle& part1, const particle& part2, const jet& j) override;
+        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
     private:
         double softPt_, hardPt_;
 };
@@ -53,7 +53,7 @@ class LostTrackFilter : public MatchingFilter {
         LostTrackFilter(double threshold):
             MatchingFilter(threshold) {}
         ~LostTrackFilter() override {};
-        bool allowMatch(const particle& part1, const particle& part2, const jet& j) override;
+        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
 };
 
 #endif

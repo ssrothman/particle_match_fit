@@ -44,6 +44,7 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
                           const jet& genjet,
                           const std::vector<std::pair<unsigned, unsigned>>& locations,
                           const enum spatialLoss type):
+      baseA(baseA),
       recoPT(recojet.ptvec()), 
       recoETA(recojet.etavec()), 
       recoPHI(recojet.phivec()),
@@ -57,7 +58,8 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
       weightedGenETA(genPT % genETA), 
       weightedGenPHI(genPT % genPHI),
       locations(locations),
-      type(type){}
+      type(type){
+      }
 
     arma::mat vecToMat(const arma::vec& data) const{
         arma::mat result(baseA);
@@ -86,6 +88,7 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         arma::vec lossPTvec = (recoPT_pred - recoPT)/ errPT;
         lossPT = arma::dot(lossPTvec, lossPTvec);
 
+        recoPT_pred.replace(0, 1);
         if (type == spatialLoss::TYPE1){
             arma::vec recoETA_pred = A * weightedGenETA;
             recoETA_pred /= recoPT_pred;

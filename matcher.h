@@ -69,67 +69,7 @@ public:
                      unsigned maxReFit=50,
                      int verbose=0,
 
-                     const matcher *const previous=nullptr) :
-            recojet_(recojet), genjet_(genjet),
-            clipval_(clipval), maxReFit_(maxReFit), 
-            verbose_(verbose), lossType_(loss) {
-
-        if (filter == matchFilterType::DR){
-            filter_ = std::make_unique<DRFilter>(cutoff);
-        } else if(filter == matchFilterType::CHARGE){
-            filter_ = std::make_unique<ChargeFilter>(cutoff);
-        } else if(filter == matchFilterType::CHARGESIGN){
-            filter_ = std::make_unique<ChargeSignFilter>(cutoff);
-        } else if(filter == matchFilterType::REALISTIC){
-            filter_ = std::make_unique<RealisticFilter>(cutoff, softPt, hardPt);
-        } else {
-            throw std::runtime_error("matcher: invalid filter type");
-        }
-
-        if(uncertainty == uncertaintyType::NAIVE){
-            uncertainty_ = std::make_unique<NaiveParticleUncertainty>();
-        } else if(uncertainty == uncertaintyType::STANDARD){
-            uncertainty_ = std::make_unique<StandardParticleUncertainty>(
-                EMstochastic,
-                EMnoise,
-                EMconstant,
-                ECALgranularity,
-                ECALEtaBoundaries,
-                HADstochastic,
-                HADconstant,
-                HCALgranularity,
-                HCALEtaBoundaries,
-                CHlinear,
-                CHconstant,
-                CHMS,
-                CHangular,
-                trkEtaBoundaries);
-        } else if (uncertainty == uncertaintyType::SMEAREDTRACKS){
-            uncertainty_ = std::make_unique<StandardParticleUncertaintySmearedTracks>(
-                EMstochastic,
-                EMnoise,
-                EMconstant,
-                ECALgranularity,
-                ECALEtaBoundaries,
-                HADstochastic,
-                HADconstant,
-                HCALgranularity,
-                HCALEtaBoundaries,
-                CHlinear,
-                CHconstant,
-                CHMS,
-                CHangular,
-                trkEtaBoundaries);
-        } else {
-            throw std::runtime_error("matcher: invalid uncertainty type");
-        }
-
-        clear();
-        fillUncertainties();
-        doPrefit(previous);
-        buildLoss();
-        initializeOptimizer();
-    }
+                     const matcher *const previous=nullptr);
 
     arma::mat ptrans();
     void killPU(arma::mat &ans); 

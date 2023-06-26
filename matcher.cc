@@ -1,5 +1,128 @@
 #include "matcher.h"
 
+matcher::matcher(const jet& recojet,
+                 const jet& genjet,
+   
+                 double clipval, 
+   
+                 enum spatialLoss loss,
+                 enum matchFilterType filter,
+                 enum uncertaintyType uncertainty,
+   
+                 double cutoff, 
+   
+                 double softPt, double hardPt,
+   
+                 const std::vector<double>& EMstochastic, 
+                 const std::vector<double>& EMnoise,
+                 const std::vector<double>& EMconstant,
+                 const std::vector<double>& ECALgranularity,
+                 const std::vector<double>& ECALEtaBoundaries,
+   
+                 const std::vector<double>& HADstochastic,
+                 const std::vector<double>& HADconstant,
+                 const std::vector<double>& HCALgranularity,
+                 const std::vector<double>& HCALEtaBoundaries,
+   
+                 const std::vector<double>& CHlinear,
+                 const std::vector<double>& CHconstant,
+                 const std::vector<double>& CHMS,
+                 const std::vector<double>& CHangular,
+                 const std::vector<double>& trkEtaBoundaries,
+   
+                 unsigned maxReFit,
+                 int verbose,
+   
+                 const matcher *const previous) :
+recojet_(recojet), genjet_(genjet),
+            clipval_(clipval), maxReFit_(maxReFit), 
+            verbose_(verbose), lossType_(loss) {
+
+    if (filter == matchFilterType::DR){
+        if(verbose_){
+            printf("matcher: using DR filter with cutoff %f\n", cutoff);
+        }
+        filter_ = std::make_unique<DRFilter>(cutoff);
+    } else if(filter == matchFilterType::CHARGE){
+        if(verbose_){
+            printf("matcher: using charge filter with cutoff %f\n", cutoff);
+        }
+        filter_ = std::make_unique<ChargeFilter>(cutoff);
+    } else if(filter == matchFilterType::CHARGESIGN){
+        if(verbose_){
+            printf("matcher: using charge sign filter with cutoff %f\n", cutoff);
+        }
+        filter_ = std::make_unique<ChargeSignFilter>(cutoff);
+    } else if(filter == matchFilterType::REALISTIC){
+        if(verbose_){
+            printf("matcher: using realistic filter with cutoff %f, softPt %f, hardPt %f\n", cutoff, softPt, hardPt);
+        }
+        filter_ = std::make_unique<RealisticFilter>(cutoff, softPt, hardPt);
+    } else if(filter == matchFilterType::LOSTTRACK){
+        if(verbose_){
+            printf("matcher: using lost track filter with cutoff %f\n", cutoff);
+        }
+        filter_ = std::make_unique<LostTrackFilter>(cutoff);
+    } else {
+        throw std::runtime_error("matcher: invalid filter type");
+    }
+
+    if(uncertainty == uncertaintyType::NAIVE){
+        if(verbose_){
+            printf("matcher: using naive uncertainty\n");
+        }
+        uncertainty_ = std::make_unique<NaiveParticleUncertainty>();
+    } else if(uncertainty == uncertaintyType::STANDARD){
+        if(verbose_){
+            printf("matcher: using standard uncertainty\n");
+        }
+        uncertainty_ = std::make_unique<StandardParticleUncertainty>(
+            EMstochastic,
+            EMnoise,
+            EMconstant,
+            ECALgranularity,
+            ECALEtaBoundaries,
+            HADstochastic,
+            HADconstant,
+            HCALgranularity,
+            HCALEtaBoundaries,
+            CHlinear,
+            CHconstant,
+            CHMS,
+            CHangular,
+            trkEtaBoundaries);
+    } else if (uncertainty == uncertaintyType::SMEAREDTRACKS){
+        if(verbose_){
+            printf("matcher: using smeared tracks uncertainty\n");
+        }
+        uncertainty_ = std::make_unique<StandardParticleUncertaintySmearedTracks>(
+            EMstochastic,
+            EMnoise,
+            EMconstant,
+            ECALgranularity,
+            ECALEtaBoundaries,
+            HADstochastic,
+            HADconstant,
+            HCALgranularity,
+            HCALEtaBoundaries,
+            CHlinear,
+            CHconstant,
+            CHMS,
+            CHangular,
+            trkEtaBoundaries);
+    } else {
+        throw std::runtime_error("matcher: invalid uncertainty type");
+    }
+
+    clear();
+    fillUncertainties();
+    doPrefit(previous);
+    buildLoss();
+    initializeOptimizer();
+}
+
+
+
 arma::mat matcher::ptrans(){
     arma::mat ans(A_);
 
@@ -79,6 +202,9 @@ const arma::mat matcher::A() const{
         const auto& loc = fitlocations_[i];
         ans(loc.first, loc.second) = optimizer_->Value(i);
     }
+    arma::rowvec denom = arma::sum(ans, 0);
+    denom.replace(0, 1);
+    ans.each_row() /= denom;
     return ans;
 }
 
@@ -95,7 +221,6 @@ void matcher::fillUncertainties(){
 }
 
 void matcher::doPrefit(const matcher* const previous){
-                       
     std::vector<unsigned> floatingGen;
     if(previous){
         A_ = previous->A();
@@ -135,18 +260,21 @@ void matcher::doPrefit(const matcher* const previous){
             printf("from previous:\n");
             std::cout << previous->A() << std::endl;
         }
-        printf("fixed by prefit:");
+        printf("fixed by prefit:\n");
         std::cout << A_ << std::endl;
         arma::mat Q = arma::mat(A_.n_rows, A_.n_cols, arma::fill::zeros);
         for(auto& p : fitlocations_){
             Q(p.first, p.second) = 1;
         }
-        printf("floating by prefit:");
+        printf("floating by prefit:\n");
         std::cout << Q << std::endl;
     }
 }
 
 void matcher::buildLoss(){
+    if(verbose_){
+        printf("buildLoss()\n");
+    }
     if(fitlocations_.size()==0){
         return;
     }
@@ -154,9 +282,15 @@ void matcher::buildLoss(){
     loss_ = std::make_unique<ChisqLossFCN>(
             A_, recojet_, genjet_, 
             fitlocations_, lossType_);
+    if(verbose_>2){
+        printf("loss mat\n");
+        std::cout << loss_->vecToMat(arma::vec(fitlocations_.size(), arma::fill::ones)) << std::endl;
+    }
 }
 
 void matcher::initializeOptimizer(){
+    if(verbose_)
+        printf("initializeOptimizer()\n");
     if(!loss_){
         return;
     }
@@ -168,15 +302,25 @@ void matcher::initializeOptimizer(){
         starting.SetLowerLimit(buffer, 0.0);
     }
     optimizer_ = std::make_unique<MnMigrad>(*loss_, starting); 
+    if(verbose_>2){
+        printf("optimizer mat\n");
+        std::cout << loss_->vecToMat(optimizer_->Params()) << std::endl;
+    }
 }
 
 void matcher::minimize(){
+    if(verbose_)
+        printf("minimize()\n");
     if(!optimizer_){
         return;
     }
     unsigned iIter=0;
     do {
         (*optimizer_)();
+        if(verbose_>2){
+            printf("optimizer mat after iteration %u\n", iIter);
+            std::cout << loss_->vecToMat(optimizer_->Params()) << std::endl;
+        }
     } while(clipValues() && ++iIter < maxReFit_-1); 
 }
 
