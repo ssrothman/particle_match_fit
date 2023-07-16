@@ -5,9 +5,11 @@ matcher::matcher(const jet& recojet,
    
                  double clipval, 
    
-                 enum spatialLoss loss,
-                 enum matchFilterType filter,
-                 enum uncertaintyType uncertainty,
+                 const  enum spatialLoss& loss,
+                 const  enum matchFilterType& filter,
+                 const  enum uncertaintyType& uncertainty,
+                 const std::vector<enum prefitterType>& prefitters,
+                 bool recoverLostTracks,
    
                  double cutoff, 
    
@@ -31,92 +33,31 @@ matcher::matcher(const jet& recojet,
                  const std::vector<double>& trkEtaBoundaries,
    
                  unsigned maxReFit,
-                 int verbose,
-   
-                 const matcher *const previous) :
-recojet_(recojet), genjet_(genjet),
-            clipval_(clipval), maxReFit_(maxReFit), 
-            verbose_(verbose), lossType_(loss) {
+                 int verbose):
+            recojet_(recojet), genjet_(genjet),
+            clipval_(clipval), 
+            recoverLostTracks_(recoverLostTracks),
+            maxReFit_(maxReFit), verbose_(verbose), 
+            lossType_(loss) {
 
-    if (filter == matchFilterType::DR){
-        if(verbose_){
-            printf("matcher: using DR filter with cutoff %f\n", cutoff);
-        }
-        filter_ = std::make_unique<DRFilter>(cutoff);
-    } else if(filter == matchFilterType::CHARGE){
-        if(verbose_){
-            printf("matcher: using charge filter with cutoff %f\n", cutoff);
-        }
-        filter_ = std::make_unique<ChargeFilter>(cutoff);
-    } else if(filter == matchFilterType::CHARGESIGN){
-        if(verbose_){
-            printf("matcher: using charge sign filter with cutoff %f\n", cutoff);
-        }
-        filter_ = std::make_unique<ChargeSignFilter>(cutoff);
-    } else if(filter == matchFilterType::REALISTIC){
-        if(verbose_){
-            printf("matcher: using realistic filter with cutoff %f, softPt %f, hardPt %f\n", cutoff, softPt, hardPt);
-        }
-        filter_ = std::make_unique<RealisticFilter>(cutoff, softPt, hardPt);
-    } else if(filter == matchFilterType::LOSTTRACK){
-        if(verbose_){
-            printf("matcher: using lost track filter with cutoff %f\n", cutoff);
-        }
-        filter_ = std::make_unique<LostTrackFilter>(cutoff);
-    } else {
-        throw std::runtime_error("matcher: invalid filter type");
+    filter_ = MatchingFilter::getFilter(filter, cutoff, softPt, hardPt);
+    uncertainty_ = ParticleUncertainty::getUncertainty(uncertainty, 
+                                                       EMstochastic, EMnoise, EMconstant, ECALgranularity, ECALEtaBoundaries,
+                                                       HADstochastic, HADconstant, HCALgranularity, HCALEtaBoundaries,
+                                                       CHlinear, CHconstant, CHMS, CHangular, trkEtaBoundaries);
+
+    if(prefitters.size() !=3 ){
+        throw std::runtime_error("matcher: invalid prefitter vector is wrong size");
     }
 
-    if(uncertainty == uncertaintyType::NAIVE){
-        if(verbose_){
-            printf("matcher: using naive uncertainty\n");
-        }
-        uncertainty_ = std::make_unique<NaiveParticleUncertainty>();
-    } else if(uncertainty == uncertaintyType::STANDARD){
-        if(verbose_){
-            printf("matcher: using standard uncertainty\n");
-        }
-        uncertainty_ = std::make_unique<StandardParticleUncertainty>(
-            EMstochastic,
-            EMnoise,
-            EMconstant,
-            ECALgranularity,
-            ECALEtaBoundaries,
-            HADstochastic,
-            HADconstant,
-            HCALgranularity,
-            HCALEtaBoundaries,
-            CHlinear,
-            CHconstant,
-            CHMS,
-            CHangular,
-            trkEtaBoundaries);
-    } else if (uncertainty == uncertaintyType::SMEAREDTRACKS){
-        if(verbose_){
-            printf("matcher: using smeared tracks uncertainty\n");
-        }
-        uncertainty_ = std::make_unique<StandardParticleUncertaintySmearedTracks>(
-            EMstochastic,
-            EMnoise,
-            EMconstant,
-            ECALgranularity,
-            ECALEtaBoundaries,
-            HADstochastic,
-            HADconstant,
-            HCALgranularity,
-            HCALEtaBoundaries,
-            CHlinear,
-            CHconstant,
-            CHMS,
-            CHangular,
-            trkEtaBoundaries);
-    } else {
-        throw std::runtime_error("matcher: invalid uncertainty type");
+    prefitters_.resize(3);
+    for(unsigned i=0; i<3; ++i){
+        prefitters_[i] = prefitter::getPrefitter(prefitters[i], filter_);
     }
-
+    
     clear();
     fillUncertainties();
-    doPrefit(previous);
+    doPrefit();
     buildLoss();
     initializeOptimizer();
 }
@@ -220,47 +161,61 @@ void matcher::fillUncertainties(){
     }
 }
 
-void matcher::doPrefit(const matcher* const previous){
-    std::vector<unsigned> floatingGen;
-    if(previous){
-        A_ = previous->A();
-        for(unsigned iGen=0; iGen<genjet_.nPart; ++iGen){
-            if(arma::accu(A_.col(iGen)) == 0){
-                floatingGen.emplace_back(iGen);
-            }
-        }
-    } else {
-        floatingGen.resize(genjet_.nPart);
-        std::iota(floatingGen.begin(), floatingGen.end(), 0);
-    }
-
+void matcher::doPrefit(){
     fitlocations_.clear();
+
+    std::vector<bool> usedGen(genjet_.particles.size(), false);
+
     for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){//foreach reco particle
         particle& reco = recojet_.particles[iReco];
+
         std::vector<unsigned> matchedgen;
-        for(unsigned iGen : floatingGen){//foreach floating gen particle
-            particle& gen = genjet_.particles[iGen];
-            if(filter_->allowMatch(reco, gen, recojet_)){//if matching is allowed
-                matchedgen.emplace_back(iGen);
-            }//end if matching
-        }//end foreach gen
+        if(reco.pdgid==22){
+            matchedgen = (*prefitters_[0])(reco, genjet_);
+        }else if(reco.pdgid==130){
+            matchedgen = (*prefitters_[1])(reco, genjet_);
+        } else if(reco.charge!=0){
+            matchedgen = (*prefitters_[2])(reco, genjet_);
+        } else {
+            throw std::runtime_error("matcher: invalid reco particle");
+        }
+
         if(matchedgen.size() == 0){//if no gen particles match
             continue;
         } else if(matchedgen.size() == 1){//if exactly one match
             A_(iReco, matchedgen[0]) = 1;
+            usedGen[matchedgen[0]] = true;
         } else {//need to fit
             for(unsigned iGen : matchedgen){
                 fitlocations_.emplace_back(iReco, iGen);
+                usedGen[iGen] = true;
             }
         }//end switch(matchedgen.size())
     }//end foreach reco
 
-    if(verbose_){
-        if(previous){
-            printf("from previous:\n");
-            std::cout << previous->A() << std::endl;
+    if(recoverLostTracks_){
+        for(unsigned iGen=0; iGen<genjet_.particles.size(); ++iGen){
+            if(usedGen[iGen]){
+                continue;
+            }
+            particle& gen = genjet_.particles[iGen];
+            if(gen.charge==0){
+                continue;
+            }
+
+            particle gencopy(gen);
+            gencopy.charge = 0;
+
+            for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
+                particle& reco = recojet_.particles[iReco];
+                if(filter_->allowMatch(reco, gencopy, recojet_)){
+                    fitlocations_.emplace_back(iReco, iGen);
+                }
+            }
         }
-        printf("fixed by prefit:\n");
+    }
+
+    if(verbose_){
         std::cout << A_ << std::endl;
         arma::mat Q = arma::mat(A_.n_rows, A_.n_cols, arma::fill::zeros);
         for(auto& p : fitlocations_){

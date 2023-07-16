@@ -17,22 +17,9 @@
 #include "chisqLossFCN.h"
 #include "MatchingFilter.h"
 #include "ParticleUncertainty.h"
+#include "prefit.h"
 
 using namespace ROOT::Minuit2;
-
-enum class matchFilterType{
-    DR = 0,
-    CHARGESIGN = 1,
-    CHARGE = 2,
-    REALISTIC = 3,
-    LOSTTRACK = 4
-};
-
-enum class uncertaintyType{
-    NAIVE = 0,
-    STANDARD = 1,
-    SMEAREDTRACKS = 2
-};
 
 class matcher{
 public:
@@ -41,9 +28,12 @@ public:
 
                      double clipval, 
 
-                     enum spatialLoss loss,
-                     enum matchFilterType filter,
-                     enum uncertaintyType uncertainty,
+                     const enum spatialLoss& loss,
+                     const enum matchFilterType& filter,
+                     const enum uncertaintyType& uncertainty,
+                     const std::vector<enum prefitterType>& prefitters,
+
+                     bool recoverLostTracks,
 
                      double cutoff, 
 
@@ -67,9 +57,7 @@ public:
                      const std::vector<double>& trkEtaBoundaries = {},
 
                      unsigned maxReFit=50,
-                     int verbose=0,
-
-                     const matcher *const previous=nullptr);
+                     int verbose=0);
 
     arma::mat ptrans();
     void killPU(arma::mat &ans); 
@@ -81,12 +69,11 @@ private:
     void clear();
     void fillUncertainties();
 
-    void doPrefit(const matcher *const previous=nullptr);
+    void doPrefit();
 
     bool clipValues();
     void initializeOptimizer();
     void buildLoss();
-    void usePreviousFit(const matcher& previous);
     
     jet recojet_, genjet_;
 
@@ -95,19 +82,20 @@ private:
 
     double clipval_;
 
-    std::unique_ptr<ParticleUncertainty> uncertainty_;
-    std::unique_ptr<MatchingFilter> filter_;
+    std::shared_ptr<ParticleUncertainty> uncertainty_;
+    std::shared_ptr<MatchingFilter> filter_;
+    std::vector<std::shared_ptr<prefitter>> prefitters_;
+
+    bool recoverLostTracks_;
 
     unsigned maxReFit_;
 
-    std::unique_ptr<ChisqLossFCN> loss_;
-    std::unique_ptr<MnMigrad> optimizer_;
+    std::shared_ptr<ChisqLossFCN> loss_;
+    std::shared_ptr<MnMigrad> optimizer_;
 
     int verbose_;
 
     enum spatialLoss lossType_;
-
-
 };
 
 #endif
