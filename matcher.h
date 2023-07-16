@@ -59,11 +59,11 @@ public:
                      unsigned maxReFit=50,
                      int verbose=0);
 
-    arma::mat ptrans();
+    arma::mat ptrans() const;
+    arma::mat rawmat() const;
+
     void killPU(arma::mat &ans); 
     void minimize();
-
-    const arma::mat A() const;
 
 private:
     void clear();

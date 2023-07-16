@@ -62,9 +62,7 @@ matcher::matcher(const jet& recojet,
     initializeOptimizer();
 }
 
-
-
-arma::mat matcher::ptrans(){
+arma::mat matcher::rawmat() const{
     arma::mat ans(A_);
 
     for(unsigned i=0; i<fitlocations_.size(); ++i){
@@ -75,6 +73,12 @@ arma::mat matcher::ptrans(){
     arma::vec colden = arma::sum(ans, 1);
     colden.replace(0, 1);
     ans.each_col() /= colden;
+
+    return ans;
+}
+
+arma::mat matcher::ptrans() const {
+    arma::mat ans = rawmat();
 
     arma::vec genpt = genjet_.ptvec();
     arma::vec recpt = recojet_.ptvec();
@@ -135,18 +139,6 @@ void matcher::killPU(arma::mat& ans){
             printf("killPU() killed reco %u\n", iReco);
         }
     }*/
-}
-
-const arma::mat matcher::A() const{
-    arma::mat ans(A_);
-    for(unsigned i=0; i<fitlocations_.size(); ++i){
-        const auto& loc = fitlocations_[i];
-        ans(loc.first, loc.second) = optimizer_->Value(i);
-    }
-    arma::rowvec denom = arma::sum(ans, 0);
-    denom.replace(0, 1);
-    ans.each_row() /= denom;
-    return ans;
 }
 
 void matcher::clear(){
@@ -284,15 +276,7 @@ bool matcher::clipValues(){
         return false;
     }
     bool didanything = false;
-    arma::mat ans(A_);
-    for(unsigned i=0; i<fitlocations_.size(); ++i){
-        unsigned x=fitlocations_[i].first;
-        unsigned y=fitlocations_[i].second;
-        ans(x, y) = optimizer_->Value(i);
-    }
-    arma::vec colden = arma::sum(ans, 1);
-    colden.replace(0, 1);
-    ans.each_col() /= colden;
+    arma::mat ans = rawmat();
 
     for(unsigned i=0; i<fitlocations_.size(); ++i){
         unsigned x=fitlocations_[i].first;
