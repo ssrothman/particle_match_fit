@@ -2,6 +2,7 @@
 
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
+                 const std::vector<bool>& excludeGen,
    
                  double clipval, 
    
@@ -9,6 +10,8 @@ matcher::matcher(const jet& recojet,
                  const  enum matchFilterType& filter,
                  const  enum uncertaintyType& uncertainty,
                  const std::vector<enum prefitterType>& prefitters,
+                 double PUexp, double PUpenalty,
+
                  bool recoverLostTracks,
    
                  double cutoff, 
@@ -33,12 +36,15 @@ matcher::matcher(const jet& recojet,
                  const std::vector<double>& trkEtaBoundaries,
    
                  unsigned maxReFit,
-                 int verbose):
+                 int verbose) :
+
             recojet_(recojet), genjet_(genjet),
             clipval_(clipval), 
+            excludeGen_(excludeGen),
             recoverLostTracks_(recoverLostTracks),
-            maxReFit_(maxReFit), verbose_(verbose), 
-            lossType_(loss) {
+            maxReFit_(maxReFit), 
+            PUexp_(PUexp), PUpenalty_(PUpenalty),
+            verbose_(verbose), lossType_(loss) {
 
     filter_ = MatchingFilter::getFilter(filter, cutoff, softPt, hardPt);
     uncertainty_ = ParticleUncertainty::getUncertainty(uncertainty, 
@@ -52,7 +58,7 @@ matcher::matcher(const jet& recojet,
 
     prefitters_.resize(3);
     for(unsigned i=0; i<3; ++i){
-        prefitters_[i] = prefitter::getPrefitter(prefitters[i], filter_);
+        prefitters_[i] = prefitter::getPrefitter(prefitters[i], filter_, excludeGen);
     }
     
     clear();
@@ -187,7 +193,7 @@ void matcher::doPrefit(){
 
     if(recoverLostTracks_){
         for(unsigned iGen=0; iGen<genjet_.particles.size(); ++iGen){
-            if(usedGen[iGen]){
+            if(usedGen[iGen] || excludeGen_[iGen]){
                 continue;
             }
             particle& gen = genjet_.particles[iGen];
@@ -222,23 +228,22 @@ void matcher::buildLoss(){
     if(verbose_){
         printf("buildLoss()\n");
     }
-    if(fitlocations_.size()==0){
-        return;
-    }
 
     loss_ = std::make_unique<ChisqLossFCN>(
             A_, recojet_, genjet_, 
-            fitlocations_, lossType_);
+            fitlocations_, lossType_,
+            PUexp_, PUpenalty_);
     if(verbose_>2){
         printf("loss mat\n");
         std::cout << loss_->vecToMat(arma::vec(fitlocations_.size(), arma::fill::ones)) << std::endl;
+        printf("loss = %f\n", loss_->operator()(std::vector<double>(fitlocations_.size(), 1.0)));
     }
 }
 
 void matcher::initializeOptimizer(){
     if(verbose_)
         printf("initializeOptimizer()\n");
-    if(!loss_){
+    if(fitlocations_.size()==0){
         return;
     }
     MnUserParameters starting;
@@ -282,11 +287,18 @@ bool matcher::clipValues(){
         unsigned x=fitlocations_[i].first;
         unsigned y=fitlocations_[i].second;
         double val = ans(x, y);
-        if(val < clipval_){
+        if(val < clipval_ && val != 0){
             optimizer_->SetValue(i, 0);
             optimizer_->Fix(i);
             didanything = true;
         }
     }
     return didanything;
+}
+
+double matcher::chisq() const{
+    if(!optimizer_){
+        return loss_->operator()(std::vector<double>({}));
+    }
+    return (*loss_)(optimizer_->Params());
 }

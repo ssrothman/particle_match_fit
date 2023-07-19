@@ -1,6 +1,9 @@
 #ifndef PMF_CHISQ_LOSS_FCN_H
 #define PMF_CHISQ_LOSS_FCN_H
 
+#include "SRothman/SimonTools/src/jets.h"
+#include "SRothman/SimonTools/src/util.h"
+
 #include "Minuit2/FCNBase.h"
 #include <vector>
 #include <memory>
@@ -28,6 +31,8 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
 
     const enum spatialLoss type;
 
+    const double PUexp, PUpenalty;
+
   public:
     ChisqLossFCN() : 
         baseA(),
@@ -37,13 +42,15 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         NPReco(0), NPGen(0),
         weightedGenETA(), weightedGenPHI(),
         locations(),
-        type(TYPE1){}
+        type(TYPE1),
+        PUexp(0), PUpenalty(0){}
 
     explicit ChisqLossFCN(const arma::mat& baseA,
                           const jet& recojet,
                           const jet& genjet,
                           const std::vector<std::pair<unsigned, unsigned>>& locations,
-                          const enum spatialLoss type):
+                          const enum spatialLoss type,
+                          double PUexp, double PUpenalty):
       baseA(baseA),
       recoPT(recojet.ptvec()), 
       recoETA(recojet.etavec()), 
@@ -58,63 +65,13 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
       weightedGenETA(genPT % genETA), 
       weightedGenPHI(genPT % genPHI),
       locations(locations),
-      type(type){
-      }
+      type(type),
+      PUexp(PUexp), PUpenalty(PUpenalty){}
 
-    arma::mat vecToMat(const arma::vec& data) const{
-        arma::mat result(baseA);
+    arma::mat vecToMat(const arma::vec& data) const;
 
-        for(unsigned i=0; i<locations.size(); ++i){
-            unsigned x=locations[i].first; 
-            unsigned y=locations[i].second;
-            result(x, y) = data[i];
-        }
-
-        return result;
-    } 
-
-    double operator()(const std::vector<double>& data) const override{
-        arma::mat A = vecToMat(data);
-        arma::rowvec denom = arma::sum(A,0);
-        denom.replace(0, 1);
-        A.each_row() /= denom;
-
-        double lossPT = 0;
-        double lossETA = 0;
-        double lossPHI = 0;
-        double lossPU = 0;
-
-        arma::vec recoPT_pred = A * (genPT);
-        arma::vec lossPTvec = (recoPT_pred - recoPT)/ errPT;
-        lossPT = arma::dot(lossPTvec, lossPTvec);
-
-        recoPT_pred.replace(0, 1);
-        if (type == spatialLoss::TYPE1){
-            arma::vec recoETA_pred = A * weightedGenETA;
-            recoETA_pred /= recoPT_pred;
-            arma::vec lossETAvec = (recoETA_pred - recoETA)/ errETA;
-            lossETA = arma::dot(lossETAvec, lossETAvec);
-
-            arma::vec recoPHI_pred = A * weightedGenPHI;
-            recoPHI_pred /= recoPT_pred;
-            arma::vec lossPHIvec = (recoPHI_pred - recoPHI)/ errPHI;
-            lossPHI = arma::dot(lossPHIvec, lossPHIvec);
-        } else if (type == spatialLoss::TYPE2){
-            arma::mat diffETA(NPReco, NPGen, arma::fill::none);
-            diffETA.each_col() = recoETA;
-            diffETA.each_row() -= arma::trans(genETA);
-            lossETA = arma::accu(diffETA % diffETA);
-
-            arma::mat diffPHI(NPReco, NPGen, arma::fill::none);
-            diffPHI.each_col() = recoPHI;
-            diffPHI.each_row() -= arma::trans(genPHI);
-            lossPHI = arma::accu(diffPHI % diffPHI);
-        }
-
-        lossPU = 0;
-
-        return lossPT + lossETA + lossPHI + lossPU;
-    };
+    double operator()(const std::vector<double>& data) const override;
+    
     //error computation constant
     //should be 1.0 for our chisq likelihood 
     inline double Up() const override {return 1.0;}

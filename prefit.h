@@ -17,17 +17,20 @@ enum class prefitterType{
 
 class prefitter{
     public:
-        prefitter(std::shared_ptr<MatchingFilter> filter) :
-            filter_(filter) {}
+        prefitter(std::shared_ptr<MatchingFilter> filter, const std::vector<bool>& excludeGen) :
+            filter_(filter),
+            excludeGen_(excludeGen) {}
         virtual ~prefitter() {};
 
         virtual std::vector<unsigned> operator()(const particle& part, const jet& j) = 0;
 
         static std::shared_ptr<prefitter> getPrefitter(const enum prefitterType& behavior, 
-                            std::shared_ptr<MatchingFilter> filter);
+                            std::shared_ptr<MatchingFilter> filter,
+                            const std::vector<bool>& excludeGen);
 
     protected:
         std::shared_ptr<MatchingFilter> filter_;
+        std::vector<bool> excludeGen_;
 };
 
 #endif

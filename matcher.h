@@ -25,6 +25,7 @@ class matcher{
 public:
     explicit matcher(const jet& recojet,
                      const jet& genjet,
+                     const std::vector<bool>& excludeGen,
 
                      double clipval, 
 
@@ -32,6 +33,7 @@ public:
                      const enum matchFilterType& filter,
                      const enum uncertaintyType& uncertainty,
                      const std::vector<enum prefitterType>& prefitters,
+                     double PUexp, double PUpenalty,
 
                      bool recoverLostTracks,
 
@@ -61,6 +63,7 @@ public:
 
     arma::mat ptrans() const;
     arma::mat rawmat() const;
+    double chisq() const;
 
     void killPU(arma::mat &ans); 
     void minimize();
@@ -85,11 +88,13 @@ private:
     std::shared_ptr<ParticleUncertainty> uncertainty_;
     std::shared_ptr<MatchingFilter> filter_;
     std::vector<std::shared_ptr<prefitter>> prefitters_;
+    std::vector<bool> excludeGen_;
 
     bool recoverLostTracks_;
 
     unsigned maxReFit_;
 
+    double PUexp_, PUpenalty_;
     std::shared_ptr<ChisqLossFCN> loss_;
     std::shared_ptr<MnMigrad> optimizer_;
 
