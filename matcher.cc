@@ -1,15 +1,33 @@
 #include "matcher.h"
+#include "matchingUtil.h"
+
+/*
+ * NOTES FOR TOMORROW:
+ *
+ * greedy things are fucked up
+ *      fixing/unfixing parameters is sketchy
+ *      changes to base A don't propagate to minimization problem
+ * 
+ * prefit refinement is fucked up
+ *      just reutns a bunch of nothing
+ *      no idea why at the moment
+ */
 
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
                  const std::vector<bool>& excludeGen,
+                 bool greedyDropMatches,
+                 bool greedyDropGen,
+                 bool greedyDropReco,
    
                  double clipval, 
    
-                 const  enum spatialLoss& loss,
-                 const  enum matchFilterType& filter,
-                 const  enum uncertaintyType& uncertainty,
+                 const enum spatialLoss& loss,
+                 const enum matchFilterType& filter,
+                 const enum uncertaintyType& uncertainty,
                  const std::vector<enum prefitterType>& prefitters,
+                 const enum prefitRefinerType& refiner,
+
                  double PUexp, double PUpenalty,
 
                  bool recoverLostTracks,
@@ -41,6 +59,9 @@ matcher::matcher(const jet& recojet,
             recojet_(recojet), genjet_(genjet),
             clipval_(clipval), 
             excludeGen_(excludeGen),
+            greedyDropMatches_(greedyDropMatches),
+            greedyDropGen_(greedyDropGen),
+            greedyDropReco_(greedyDropReco),
             recoverLostTracks_(recoverLostTracks),
             maxReFit_(maxReFit), 
             PUexp_(PUexp), PUpenalty_(PUpenalty),
@@ -60,6 +81,8 @@ matcher::matcher(const jet& recojet,
     for(unsigned i=0; i<3; ++i){
         prefitters_[i] = prefitter::getPrefitter(prefitters[i], filter_, excludeGen);
     }
+
+    refiner_ = prefitRefiner::getRefiner(refiner);
     
     clear();
     fillUncertainties();
@@ -69,18 +92,11 @@ matcher::matcher(const jet& recojet,
 }
 
 arma::mat matcher::rawmat() const{
-    arma::mat ans(A_);
-
-    for(unsigned i=0; i<fitlocations_.size(); ++i){
-        const auto& loc = fitlocations_[i];
-        ans(loc.first, loc.second) = optimizer_->Value(i);
+    if(optimizer_){
+        return fullmat(A_, fitlocations_, optimizer_->Params());
+    } else {
+        return fullmat(A_, {}, {});
     }
-
-    arma::vec colden = arma::sum(ans, 1);
-    colden.replace(0, 1);
-    ans.each_col() /= colden;
-
-    return ans;
 }
 
 arma::mat matcher::ptrans() const {
@@ -164,6 +180,8 @@ void matcher::doPrefit(){
 
     std::vector<bool> usedGen(genjet_.particles.size(), false);
 
+    std::unordered_map<unsigned, std::vector<unsigned>> recoToGen;
+
     for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){//foreach reco particle
         particle& reco = recojet_.particles[iReco];
 
@@ -178,22 +196,17 @@ void matcher::doPrefit(){
             throw std::runtime_error("matcher: invalid reco particle");
         }
 
-        if(matchedgen.size() == 0){//if no gen particles match
-            continue;
-        } else if(matchedgen.size() == 1){//if exactly one match
-            A_(iReco, matchedgen[0]) = 1;
-            usedGen[matchedgen[0]] = true;
-        } else {//need to fit
+        if(matchedgen.size()){
+            recoToGen[iReco] = matchedgen;
             for(unsigned iGen : matchedgen){
-                fitlocations_.emplace_back(iReco, iGen);
                 usedGen[iGen] = true;
             }
-        }//end switch(matchedgen.size())
+        }
     }//end foreach reco
 
     if(recoverLostTracks_){
         for(unsigned iGen=0; iGen<genjet_.particles.size(); ++iGen){
-            if(usedGen[iGen] || excludeGen_[iGen]){
+            if(usedGen[iGen]){
                 continue;
             }
             particle& gen = genjet_.particles[iGen];
@@ -207,13 +220,29 @@ void matcher::doPrefit(){
             for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
                 particle& reco = recojet_.particles[iReco];
                 if(filter_->allowMatch(reco, gencopy, recojet_)){
-                    fitlocations_.emplace_back(iReco, iGen);
+                    recoToGen[iReco].push_back(iGen);
+                    usedGen[iGen] = true;
                 }
             }
         }
     }
 
+    prefitRefiner::matchMap genToReco = refiner_->refine(recoToGen, recojet_, genjet_);
+
+    for(const auto& p : genToReco){
+        if(p.second.size()==0){
+            continue;
+        //} else if(p.second.size()==1){
+        //    //A_(p.second[0], p.first) = 1;
+        } else {
+            for(unsigned iReco : p.second){
+                fitlocations_.emplace_back(iReco, p.first);
+            }
+        }
+    }
+
     if(verbose_){
+        printf("fixed by prefit:\n");
         std::cout << A_ << std::endl;
         arma::mat Q = arma::mat(A_.n_rows, A_.n_cols, arma::fill::zeros);
         for(auto& p : fitlocations_){
@@ -235,33 +264,43 @@ void matcher::buildLoss(){
             PUexp_, PUpenalty_);
     if(verbose_>2){
         printf("loss mat\n");
-        std::cout << loss_->vecToMat(arma::vec(fitlocations_.size(), arma::fill::ones)) << std::endl;
+        std::cout << rawmat();
         printf("loss = %f\n", loss_->operator()(std::vector<double>(fitlocations_.size(), 1.0)));
     }
 }
 
 void matcher::initializeOptimizer(){
-    if(verbose_)
+    if(verbose_>1)
         printf("initializeOptimizer()\n");
     if(fitlocations_.size()==0){
         return;
     }
     MnUserParameters starting;
     char buffer[4];
+    std::unordered_map<unsigned, std::vector<unsigned>> genToMatchIdx;
+        ;
     for(unsigned i=0; i<fitlocations_.size(); ++i){
         sprintf(buffer, "%u", i);
-        starting.Add(buffer, 1.0, 1.0);
-        starting.SetLowerLimit(buffer, 0.0);
+        starting.Add(buffer, 0.5, 0.5, 0.0, 1.0);
+        genToMatchIdx[fitlocations_[i].second].emplace_back(i);
+    }
+    for(const auto& match : genToMatchIdx){
+        if(match.second.size()==1){
+            unsigned iMatch = match.second[0];
+            starting.RemoveLimits(iMatch);
+            starting.SetValue(iMatch, 1.0);
+            starting.Fix(iMatch);
+        }
     }
     optimizer_ = std::make_unique<MnMigrad>(*loss_, starting); 
     if(verbose_>2){
         printf("optimizer mat\n");
-        std::cout << loss_->vecToMat(optimizer_->Params()) << std::endl;
+        std::cout << rawmat();
     }
 }
 
 void matcher::minimize(){
-    if(verbose_)
+    if(verbose_>1)
         printf("minimize()\n");
     if(!optimizer_){
         return;
@@ -271,9 +310,58 @@ void matcher::minimize(){
         (*optimizer_)();
         if(verbose_>2){
             printf("optimizer mat after iteration %u\n", iIter);
-            std::cout << loss_->vecToMat(optimizer_->Params()) << std::endl;
+            std::cout << rawmat();
         }
     } while(clipValues() && ++iIter < maxReFit_-1); 
+
+    if(greedyDropGen_){
+        greedyDropParticles<true>();
+    }
+
+    if(greedyDropMatches_){
+        greedyDropMatches();
+    }
+
+    if(greedyDropReco_){
+        greedyDropParticles<false>();
+    }
+
+    if (verbose_>1){
+        printf("conservation of energy?\n");
+        printf("sum(gen) = %f\n", arma::accu(genjet_.ptvec()));
+        printf("sum(A*gen) = %f\n", arma::accu(rawmat()*genjet_.ptvec()));
+    }
+}
+
+void matcher::greedyDropMatches(){
+    double bestchisq = chisq();
+    for(unsigned iMatch=0; iMatch < fitlocations_.size(); ++iMatch){//for each match
+        double savedval = optimizer_->Value(iMatch);
+        if(savedval == 0){
+            continue;
+        }
+        optimizer_->SetValue(iMatch, 0);
+        optimizer_->Fix(iMatch);
+        (*optimizer_)();
+        double newchisq = chisq();
+        if(verbose_>2){
+
+            printf("dropping match (%u, %u):\n", fitlocations_[iMatch].first, fitlocations_[iMatch].second);
+            std::cout << rawmat() << std::endl;
+        }
+        if(newchisq < bestchisq){
+            if(verbose_>2){
+                printf("\treduced chisq from %f to %f\n", bestchisq, newchisq);
+            }
+            bestchisq = newchisq;
+        } else {
+            if(verbose_>2){
+                printf("\tincreased chisq from %f to %f\n", bestchisq, newchisq);
+            }
+            optimizer_->SetValue(iMatch, savedval);
+            optimizer_->Release(iMatch);
+        }
+    }
 }
 
 bool matcher::clipValues(){
@@ -300,5 +388,5 @@ double matcher::chisq() const{
     if(!optimizer_){
         return loss_->operator()(std::vector<double>({}));
     }
-    return (*loss_)(optimizer_->Params());
+    return loss_->operator()(optimizer_->Params());
 }

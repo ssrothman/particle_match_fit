@@ -68,8 +68,6 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
       type(type),
       PUexp(PUexp), PUpenalty(PUpenalty){}
 
-    arma::mat vecToMat(const arma::vec& data) const;
-
     double operator()(const std::vector<double>& data) const override;
     
     //error computation constant

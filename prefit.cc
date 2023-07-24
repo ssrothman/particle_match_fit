@@ -1,4 +1,6 @@
 #include "prefit.h"
+#include "SRothman/SimonTools/src/util.h"
+#include "matchingUtil.h"
 
 class NOMATCHprefitter: public prefitter{
     public:
@@ -78,7 +80,7 @@ class BESTprefitter : public prefitter{
         ~BESTprefitter() {};
 
         std::vector<unsigned> operator()(const particle& part, const jet& j) override {
-            double minChisq = 99999;
+            double minChisq = std::numeric_limits<double>::infinity();
             int bestIdx = -1;
 
             for(unsigned i=0; i<j.nPart; ++i){
@@ -86,13 +88,7 @@ class BESTprefitter : public prefitter{
             
 
                 if(!excludeGen_[i] && filter_->allowMatch(part, genpart, j)){
-                    double dpt = genpart.pt - part.pt;
-                    double deta = genpart.eta - part.eta;
-                    double dphi = genpart.phi - part.phi;
-                    if(dphi>M_PI) dphi -= 2*M_PI;
-                    if(dphi<-M_PI) dphi += 2*M_PI;
-
-                    double chisq = dpt*dpt/part.dpt + deta*deta/part.deta + dphi*dphi/part.dphi;
+                    double chisq = chisquared(part, genpart, true);
 
                     if(chisq < minChisq || bestIdx==-1){
                         minChisq = chisq;

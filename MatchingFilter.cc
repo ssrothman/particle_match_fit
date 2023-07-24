@@ -1,4 +1,5 @@
-#include "SRothman/Matching/src/MatchingFilter.h"
+#include "MatchingFilter.h"
+#include "matchingUtil.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 
 class DRFilter : public MatchingFilter {
@@ -42,19 +43,14 @@ class LostTrackFilter : public MatchingFilter {
 };
 
 bool MatchingFilter::passDR(const particle& reco, const particle& gen, const jet& j){
-    double dR = std::sqrt(dR2(reco.eta,reco.phi, gen.eta,gen.phi));
-    double err = std::sqrt(reco.deta*reco.deta + reco.dphi*reco.dphi);
-    //printf("\tDR filter: dR: %0.3g, err: %0.3g, ratio: %0.3f\n", dR, err, dR/err);
-    return dR/err < threshold_;
+    return chisquared(reco, gen, false) < threshold_;
 }
 
 bool MatchingFilter::sameCharge(const particle& reco, const particle& gen, const jet& j){
-    //printf("CHARGE filter: %i, %i\n", reco.charge, gen.charge);
     return std::abs(reco.charge) == std::abs(gen.charge);
 }
 
 bool MatchingFilter::sameChargeSign(const particle& reco, const particle& gen, const jet& j){
-    //printf("CHARGESIGN filter: %i, %i\n", reco.charge, gen.charge);
     return reco.charge == gen.charge;
 }
 

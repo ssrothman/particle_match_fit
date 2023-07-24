@@ -1,21 +1,8 @@
 #include "chisqLossFCN.h"
+#include "matchingUtil.h"
 
-arma::mat ChisqLossFCN::vecToMat(const arma::vec& data) const{
-    arma::mat result(baseA);
-
-    for(unsigned i=0; i<locations.size(); ++i){
-        unsigned x=locations[i].first; 
-        unsigned y=locations[i].second;
-        result(x, y) = data[i];
-    }
-
-    return result;
-} 
 double ChisqLossFCN::operator()(const std::vector<double>& data) const {
-    arma::mat A = vecToMat(data);
-    arma::rowvec denom = arma::sum(A,0);
-    denom.replace(0, 1);
-    A.each_row() /= denom;
+    arma::mat A = fullmat(baseA, locations, data);
 
     double lossPT = 0;
     double lossETA = 0;
