@@ -15,8 +15,7 @@
 
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
-                 const std::vector<bool>& excludeGen,
-                 bool greedyDropMatches,
+
                  bool greedyDropGen,
                  bool greedyDropReco,
    
@@ -58,8 +57,6 @@ matcher::matcher(const jet& recojet,
 
             recojet_(recojet), genjet_(genjet),
             clipval_(clipval), 
-            excludeGen_(excludeGen),
-            greedyDropMatches_(greedyDropMatches),
             greedyDropGen_(greedyDropGen),
             greedyDropReco_(greedyDropReco),
             recoverLostTracks_(recoverLostTracks),
@@ -79,12 +76,11 @@ matcher::matcher(const jet& recojet,
 
     prefitters_.resize(3);
     for(unsigned i=0; i<3; ++i){
-        prefitters_[i] = prefitter::getPrefitter(prefitters[i], filter_, excludeGen);
+        prefitters_[i] = prefitter::getPrefitter(prefitters[i], filter_);
     }
 
     refiner_ = prefitRefiner::getRefiner(refiner);
     
-    clear();
     fillUncertainties();
     doPrefit();
     buildLoss();
@@ -93,9 +89,10 @@ matcher::matcher(const jet& recojet,
 
 arma::mat matcher::rawmat() const{
     if(optimizer_){
-        return fullmat(A_, fitlocations_, optimizer_->Params());
+        return fullmat(recojet_.nPart, genjet_.nPart, 
+                       fitlocations_, optimizer_->Params());
     } else {
-        return fullmat(A_, {}, {});
+        return fullmat(recojet_.nPart, genjet_.nPart, {}, {});
     }
 }
 
@@ -130,45 +127,6 @@ arma::mat matcher::ptrans() const {
     return ans;
 }
 
-void matcher::killPU(arma::mat& ans){
-    /*arma::rowvec denom = arma::sum(ans, 0);
-    denom.replace(0, 1);
-    arma::mat tmp(ans);
-    tmp.each_row() /= denom;
-
-    arma::vec recoPT_pred = tmp * realGenPT;
-    arma::vec diff = arma::abs(recoPT_pred - realRecoPT)/realErrPT;
-    arma::uvec bad = arma::find(diff > cutoff);
-    if(verbose_){
-        printf("killPU() found %llu bad reco particles\n", bad.n_elem);
-        printf("absdif\n");
-        std::cout << arma::trans(arma::abs(recoPT_pred - globalRecoPT)) << std::endl;
-        printf("diff\n");
-        std::cout << arma::trans(diff) << std::endl;
-        printf("bad\n");
-        std::cout << arma::trans(bad) << std::endl;
-    }
-    for(unsigned i=0; i<bad.n_elem; ++i){
-        bool didAnything=false;
-        unsigned iReco = bad(i);
-        for(unsigned iGen = 0; iGen<ans.n_cols; ++iGen){
-            if(ans(iReco, iGen)){
-                ans(iReco, iGen) = 0;
-                didAnything = true;
-            }
-        }
-        if(verbose_ && didAnything){
-            printf("killPU() killed reco %u\n", iReco);
-        }
-    }*/
-}
-
-void matcher::clear(){
-    A_ = arma::mat(recojet_.particles.size(), 
-                  genjet_.particles.size(), 
-                  arma::fill::zeros);
-}
-
 void matcher::fillUncertainties(){
     for(particle& p : recojet_.particles){
         uncertainty_->addUncertainty(p, recojet_); 
@@ -176,8 +134,6 @@ void matcher::fillUncertainties(){
 }
 
 void matcher::doPrefit(){
-    fitlocations_.clear();
-
     std::vector<bool> usedGen(genjet_.particles.size(), false);
 
     std::unordered_map<unsigned, std::vector<unsigned>> recoToGen;
@@ -232,24 +188,34 @@ void matcher::doPrefit(){
     for(const auto& p : genToReco){
         if(p.second.size()==0){
             continue;
-        //} else if(p.second.size()==1){
-        //    //A_(p.second[0], p.first) = 1;
         } else {
             for(unsigned iReco : p.second){
                 fitlocations_.emplace_back(iReco, p.first);
+
+                if(p.second.size()==1){
+                    floating_.emplace_back(false);
+                } else {
+                    floating_.emplace_back(true);
+                }
             }
         }
     }
 
     if(verbose_){
-        printf("fixed by prefit:\n");
-        std::cout << A_ << std::endl;
-        arma::mat Q = arma::mat(A_.n_rows, A_.n_cols, arma::fill::zeros);
-        for(auto& p : fitlocations_){
-            Q(p.first, p.second) = 1;
+        arma::mat fixed(recojet_.nPart, genjet_.nPart, arma::fill::zeros);
+        arma::mat floating(recojet_.nPart, genjet_.nPart, arma::fill::zeros);
+        for(unsigned i=0; i<fitlocations_.size(); ++i){
+            const auto& match = fitlocations_[i];
+            if(floating_[i]){
+                floating(match.first, match.second) = 1;
+            } else {
+                fixed(match.first, match.second) = 1;
+            }
         }
+        printf("fixed by prefit:\n");
+        std::cout << fixed << std::endl;
         printf("floating by prefit:\n");
-        std::cout << Q << std::endl;
+        std::cout << floating << std::endl;
     }
 }
 
@@ -259,7 +225,7 @@ void matcher::buildLoss(){
     }
 
     loss_ = std::make_unique<ChisqLossFCN>(
-            A_, recojet_, genjet_, 
+            recojet_, genjet_, 
             fitlocations_, lossType_,
             PUexp_, PUpenalty_);
     if(verbose_>2){
@@ -277,21 +243,18 @@ void matcher::initializeOptimizer(){
     }
     MnUserParameters starting;
     char buffer[4];
-    std::unordered_map<unsigned, std::vector<unsigned>> genToMatchIdx;
-        ;
+
     for(unsigned i=0; i<fitlocations_.size(); ++i){
         sprintf(buffer, "%u", i);
-        starting.Add(buffer, 0.5, 0.5, 0.0, 1.0);
-        genToMatchIdx[fitlocations_[i].second].emplace_back(i);
-    }
-    for(const auto& match : genToMatchIdx){
-        if(match.second.size()==1){
-            unsigned iMatch = match.second[0];
-            starting.RemoveLimits(iMatch);
-            starting.SetValue(iMatch, 1.0);
-            starting.Fix(iMatch);
+        if(floating_[i]){
+            starting.Add(buffer, 0.5, 0.5, 0.0, 1.0);
+            starting.Release(buffer);
+        } else {
+            starting.Add(buffer, 1.0);
+            starting.Fix(buffer);
         }
     }
+
     optimizer_ = std::make_unique<MnMigrad>(*loss_, starting); 
     if(verbose_>2){
         printf("optimizer mat\n");
@@ -305,26 +268,14 @@ void matcher::minimize(){
     if(!optimizer_){
         return;
     }
-    unsigned iIter=0;
-    do {
-        (*optimizer_)();
-        if(verbose_>2){
-            printf("optimizer mat after iteration %u\n", iIter);
-            std::cout << rawmat();
-        }
-    } while(clipValues() && ++iIter < maxReFit_-1); 
 
-    if(greedyDropGen_){
-        greedyDropParticles<true>();
+    (*optimizer_)();
+    if(verbose_>1){
+        printf("rough fit:\n");
+        std::cout << rawmat();
     }
-
-    if(greedyDropMatches_){
-        greedyDropMatches();
-    }
-
-    if(greedyDropReco_){
-        greedyDropParticles<false>();
-    }
+    
+    refineFit();
 
     if (verbose_>1){
         printf("conservation of energy?\n");
@@ -333,55 +284,37 @@ void matcher::minimize(){
     }
 }
 
-void matcher::greedyDropMatches(){
-    double bestchisq = chisq();
-    for(unsigned iMatch=0; iMatch < fitlocations_.size(); ++iMatch){//for each match
-        double savedval = optimizer_->Value(iMatch);
-        if(savedval == 0){
-            continue;
-        }
-        optimizer_->SetValue(iMatch, 0);
-        optimizer_->Fix(iMatch);
-        (*optimizer_)();
-        double newchisq = chisq();
-        if(verbose_>2){
-
-            printf("dropping match (%u, %u):\n", fitlocations_[iMatch].first, fitlocations_[iMatch].second);
-            std::cout << rawmat() << std::endl;
-        }
-        if(newchisq < bestchisq){
-            if(verbose_>2){
-                printf("\treduced chisq from %f to %f\n", bestchisq, newchisq);
-            }
-            bestchisq = newchisq;
-        } else {
-            if(verbose_>2){
-                printf("\tincreased chisq from %f to %f\n", bestchisq, newchisq);
-            }
-            optimizer_->SetValue(iMatch, savedval);
-            optimizer_->Release(iMatch);
-        }
-    }
-}
-
 bool matcher::clipValues(){
     if(!optimizer_){
         return false;
     }
-    bool didanything = false;
-    arma::mat ans = rawmat();
 
+    arma::mat A = rawmat();
+
+    bool didanything = false;
     for(unsigned i=0; i<fitlocations_.size(); ++i){
-        unsigned x=fitlocations_[i].first;
-        unsigned y=fitlocations_[i].second;
-        double val = ans(x, y);
-        if(val < clipval_ && val != 0){
+        const auto& match = fitlocations_[i];
+        double val = A(match.first, match.second);
+        if(floating_[i] && val < clipval_){
             optimizer_->SetValue(i, 0);
             optimizer_->Fix(i);
+            floating_[i] = false;
             didanything = true;
         }
     }
     return didanything;
+}
+
+void matcher::iterativelyClip(){
+    for(unsigned iIter=0; iIter < maxReFit_; ++iIter){
+        if(!clipValues()){
+            return;
+        }
+        if(verbose_>2){
+            printf("optimizer mat after iteration %u\n", iIter);
+            std::cout << rawmat();
+        }
+    }
 }
 
 double matcher::chisq() const{
@@ -389,4 +322,76 @@ double matcher::chisq() const{
         return loss_->operator()(std::vector<double>({}));
     }
     return loss_->operator()(optimizer_->Params());
+}
+
+void matcher::refineFit(){
+    if (greedyDropGen_){
+        greedyDropParticles(true);
+    } 
+
+    if(greedyDropReco_){
+        greedyDropParticles(false);
+    }
+
+    iterativelyClip();
+}
+
+void matcher::greedyDropParticles(bool gen){
+    unsigned maxI = gen ? genjet_.nPart : recojet_.nPart;
+    
+    for(unsigned i=0; i<maxI; ++i){
+        if(gen){
+            testDrop(i, -1);
+        } else {
+            testDrop(-1, i);
+        }
+    }
+}
+
+void matcher::testDrop(int iGen, int iReco){
+    if(!optimizer_){
+        return;
+    }
+
+    if(iGen<0 && iReco<0){
+        return;
+    }
+
+    MnUserParameters savedstate = optimizer_->Parameters();
+    double savedchisq = chisq();
+    std::vector<double> savedfloating(floating_.begin(), floating_.end());
+
+    bool foundany=false;
+    for(unsigned i=0; i<fitlocations_.size(); ++i){
+        const auto& match = fitlocations_[i];
+        if(match.second == iGen || match.first == iReco){
+            optimizer_->SetValue(i, 0);
+            optimizer_->Fix(i);
+            floating_[i] = false;
+            foundany = true;
+        }
+    }
+    
+    if(!foundany){
+        return;
+    }
+
+    (*optimizer_)();
+    
+    double newchisq = chisq();
+
+    if(newchisq < savedchisq){
+        if(verbose_){
+            printf("dropping gen %d, reco %d improved chisq from %f to %f\n", iGen, iReco, savedchisq, newchisq);
+        }
+    } else {
+        if(verbose_){
+            printf("dropping gen %d, reco %d worsened chisq from %f to %f\n", iGen, iReco, savedchisq, newchisq);
+            printf("\tresetting optimizer\n");
+        }
+        optimizer_ = std::make_unique<MnMigrad>(*loss_, savedstate);
+        for(unsigned i=0; i<floating_.size(); ++i){
+            floating_[i] = savedfloating[i];
+        }
+    }
 }

@@ -26,8 +26,7 @@ class matcher{
 public:
     explicit matcher(const jet& recojet,
                      const jet& genjet,
-                     const std::vector<bool>& excludeGen,
-                     bool greedyDropMatches,
+
                      bool greedyDropGen,
                      bool greedyDropReco,
 
@@ -70,112 +69,26 @@ public:
     arma::mat rawmat() const;
     double chisq() const;
 
-    void killPU(arma::mat &ans); 
     void minimize();
 
 private:
-    template<bool gen>
-    void greedyDropParticles(){
-        double bestchisq = chisq();
-
-        unsigned nPart;
-        if constexpr(gen){
-            nPart = genjet_.nPart;
-        } else {
-            nPart = recojet_.nPart;
-        }
-
-        unsigned otherNPart;
-        if constexpr(gen){
-            otherNPart = recojet_.nPart;
-        } else {
-            otherNPart = genjet_.nPart;
-        }
-
-        for(unsigned iThis=0; iThis<nPart; ++iThis){//for each particle
-            std::vector<double> oldstate = optimizer_->Params();
-            arma::mat oldA(A_);
-
-            bool anyFloating=false;
-            std::vector<unsigned> changed;
-            for(unsigned i=0; i<fitlocations_.size(); ++i){
-                bool found;
-                if constexpr(gen){
-                    found = fitlocations_[i].second == iThis;
-                } else {
-                    found = fitlocations_[i].first == iThis;
-                }
-                if(found && optimizer_->Value(i) !=0){
-                    anyFloating=true;
-                    optimizer_->SetValue(i, 0);
-                    optimizer_->Fix(i);
-                    changed.emplace_back(i);
-                }
-            }
-
-            for(unsigned iOther=0; iOther<otherNPart; ++iOther){
-                double val;
-                if constexpr(gen){
-                    val = A_.at(iOther, iThis);
-                } else {
-                    val = A_.at(iThis, iOther);
-                }
-                if(val != 0){
-                    if constexpr(gen){
-                        A_.at(iOther, iThis) = 0;
-                    } else {
-                        A_.at(iThis, iOther) = 0;
-                    }
-                }
-            }
-
-            if(verbose_){
-                printf("dropped particle %u:\n", iThis);
-                std::cout << rawmat();
-            }
-
-            if(anyFloating){
-                (*optimizer_)();
-            }
-
-            double newchisq = chisq();
-
-            if(newchisq < bestchisq){//if improved
-                if(verbose_){
-                    printf("dropping particle %u reduced chisq from %f to %f\n", iThis, bestchisq, newchisq);
-                }
-                bestchisq = newchisq;
-            } else {//else if got worse
-                if(verbose_){
-                    printf("dropping particle %u increased chisq from %f to %f\n", iThis, bestchisq, newchisq);
-                }
-                for(unsigned iMatch=0; iMatch < oldstate.size(); ++iMatch){
-                    optimizer_->SetValue(iMatch, oldstate[iMatch]);
-                }
-                for(unsigned iMatch : changed){
-                    optimizer_->Release(iMatch);
-                }
-                A_ = oldA;
-            }//end if improved
-        }//end for each particle
-    }//end greedyDropParticles<gen>()
-
-
-    void clear();
     void fillUncertainties();
 
     void doPrefit();
 
     bool clipValues();
+    void iterativelyClip();
     void initializeOptimizer();
     void buildLoss();
 
-    void greedyDropMatches();
-    
+    void refineFit();
+    void greedyDropParticles(bool gen);
+    void testDrop(int iGen, int iReco);
+
     jet recojet_, genjet_;
 
-    arma::mat A_;
     std::vector<std::pair<unsigned, unsigned>> fitlocations_;
+    std::vector<bool> floating_;
 
     double clipval_;
 
@@ -183,8 +96,7 @@ private:
     std::shared_ptr<MatchingFilter> filter_;
     std::vector<std::shared_ptr<prefitter>> prefitters_;
     std::shared_ptr<prefitRefiner> refiner_;
-    std::vector<bool> excludeGen_;
-    bool greedyDropMatches_;
+
     bool greedyDropGen_;
     bool greedyDropReco_;
 

@@ -17,8 +17,6 @@ enum spatialLoss{
 class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
   private:
     //data defining fit problem
-    const arma::mat baseA;
-
     const arma::vec recoPT, recoETA, recoPHI;
     const arma::vec genPT, genETA, genPHI;
     const arma::vec errPT, errETA, errPHI;
@@ -35,7 +33,6 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
 
   public:
     ChisqLossFCN() : 
-        baseA(),
         recoPT(), recoETA(), recoPHI(),
         genPT(), genETA(), genPHI(),
         errPT(), errETA(), errPHI(),
@@ -45,13 +42,11 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         type(TYPE1),
         PUexp(0), PUpenalty(0){}
 
-    explicit ChisqLossFCN(const arma::mat& baseA,
-                          const jet& recojet,
+    explicit ChisqLossFCN(const jet& recojet,
                           const jet& genjet,
                           const std::vector<std::pair<unsigned, unsigned>>& locations,
                           const enum spatialLoss type,
                           double PUexp, double PUpenalty):
-      baseA(baseA),
       recoPT(recojet.ptvec()), 
       recoETA(recojet.etavec()), 
       recoPHI(recojet.phivec()),

@@ -1,9 +1,9 @@
 #include "matchingUtil.h"
 
-arma::mat fullmat(const arma::mat& A,
+arma::mat fullmat(const unsigned nrow, const unsigned ncol,
                   const std::vector<std::pair<unsigned, unsigned>>& locs,
                   const std::vector<double>& vals){
-    arma::mat ans = A;
+    arma::mat ans(nrow, ncol, arma::fill::none);
     for(unsigned i = 0; i < locs.size(); i++){
         ans(locs[i].first, locs[i].second) = vals[i];
     }

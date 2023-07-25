@@ -2,7 +2,7 @@
 #include "matchingUtil.h"
 
 double ChisqLossFCN::operator()(const std::vector<double>& data) const {
-    arma::mat A = fullmat(baseA, locations, data);
+    arma::mat A = fullmat(recoPT.n_elem, genPT.n_elem, locations, data);
 
     double lossPT = 0;
     double lossETA = 0;
