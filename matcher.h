@@ -19,6 +19,7 @@
 #include "ParticleUncertainty.h"
 #include "prefit.h"
 #include "refinePrefit.h"
+#include "particleFilter.h"
 
 using namespace ROOT::Minuit2;
 
@@ -27,9 +28,6 @@ public:
     explicit matcher(const jet& recojet,
                      const jet& genjet,
 
-                     bool greedyDropGen,
-                     bool greedyDropReco,
-
                      double clipval, 
 
                      const enum spatialLoss& loss,
@@ -37,6 +35,9 @@ public:
                      const enum uncertaintyType& uncertainty,
                      const std::vector<enum prefitterType>& prefitters,
                      const enum prefitRefinerType& refiner,
+                     const enum particleFilterType& dropGenFilter,
+                     const enum particleFilterType& dropRecoFilter,
+
                      double PUexp, double PUpenalty,
 
                      bool recoverLostTracks,
@@ -96,9 +97,8 @@ private:
     std::shared_ptr<MatchingFilter> filter_;
     std::vector<std::shared_ptr<prefitter>> prefitters_;
     std::shared_ptr<prefitRefiner> refiner_;
-
-    bool greedyDropGen_;
-    bool greedyDropReco_;
+    std::shared_ptr<particleFilter> dropGenFilter_;
+    std::shared_ptr<particleFilter> dropRecoFilter_;
 
     bool recoverLostTracks_;
 

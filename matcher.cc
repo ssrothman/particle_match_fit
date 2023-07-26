@@ -4,9 +4,6 @@
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
 
-                 bool greedyDropGen,
-                 bool greedyDropReco,
-   
                  double clipval, 
    
                  const enum spatialLoss& loss,
@@ -14,6 +11,8 @@ matcher::matcher(const jet& recojet,
                  const enum uncertaintyType& uncertainty,
                  const std::vector<enum prefitterType>& prefitters,
                  const enum prefitRefinerType& refiner,
+                 const enum particleFilterType& dropGenFilter,
+                 const enum particleFilterType& dropRecoFilter,
 
                  double PUexp, double PUpenalty,
 
@@ -45,8 +44,6 @@ matcher::matcher(const jet& recojet,
 
             recojet_(recojet), genjet_(genjet),
             clipval_(clipval), 
-            greedyDropGen_(greedyDropGen),
-            greedyDropReco_(greedyDropReco),
             recoverLostTracks_(recoverLostTracks),
             maxReFit_(maxReFit), 
             PUexp_(PUexp), PUpenalty_(PUpenalty),
@@ -68,6 +65,9 @@ matcher::matcher(const jet& recojet,
     }
 
     refiner_ = prefitRefiner::getRefiner(refiner);
+
+    dropGenFilter_ = particleFilter::getParticleFilter(dropGenFilter);
+    dropRecoFilter_ = particleFilter::getParticleFilter(dropRecoFilter);
     
     fillUncertainties();
     doPrefit();
@@ -314,13 +314,8 @@ double matcher::chisq() const{
 }
 
 void matcher::refineFit(){
-    if (greedyDropGen_){
-        greedyDropParticles(true);
-    } 
-
-    if(greedyDropReco_){
-        greedyDropParticles(false);
-    }
+    greedyDropParticles(true);
+    greedyDropParticles(false);
 
     iterativelyClip();
 }
@@ -329,9 +324,9 @@ void matcher::greedyDropParticles(bool gen){
     unsigned maxI = gen ? genjet_.nPart : recojet_.nPart;
     
     for(unsigned i=0; i<maxI; ++i){
-        if(gen){
+        if(gen && dropGenFilter_->pass(genjet_.particles[i])){
             testDrop(i, -1);
-        } else {
+        } else if (!gen && dropRecoFilter_->pass(recojet_.particles[i])) {
             testDrop(-1, i);
         }
     }
