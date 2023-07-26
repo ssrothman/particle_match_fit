@@ -1,18 +1,6 @@
 #include "matcher.h"
 #include "matchingUtil.h"
 
-/*
- * NOTES FOR TOMORROW:
- *
- * greedy things are fucked up
- *      fixing/unfixing parameters is sketchy
- *      changes to base A don't propagate to minimization problem
- * 
- * prefit refinement is fucked up
- *      just reutns a bunch of nothing
- *      no idea why at the moment
- */
-
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
 
@@ -92,7 +80,8 @@ arma::mat matcher::rawmat() const{
         return fullmat(recojet_.nPart, genjet_.nPart, 
                        fitlocations_, optimizer_->Params());
     } else {
-        return fullmat(recojet_.nPart, genjet_.nPart, {}, {});
+        arma::mat result = fullmat(recojet_.nPart, genjet_.nPart, {}, {});
+        return result;
     }
 }
 
@@ -152,7 +141,7 @@ void matcher::doPrefit(){
             throw std::runtime_error("matcher: invalid reco particle");
         }
 
-        if(matchedgen.size()){
+        if(!matchedgen.empty()){
             recoToGen[iReco] = matchedgen;
             for(unsigned iGen : matchedgen){
                 usedGen[iGen] = true;
@@ -165,7 +154,7 @@ void matcher::doPrefit(){
             if(usedGen[iGen]){
                 continue;
             }
-            particle& gen = genjet_.particles[iGen];
+            const particle& gen = genjet_.particles[iGen];
             if(gen.charge==0){
                 continue;
             }
@@ -364,7 +353,11 @@ void matcher::testDrop(int iGen, int iReco){
     bool foundany=false;
     for(unsigned i=0; i<fitlocations_.size(); ++i){
         const auto& match = fitlocations_[i];
-        if(match.second == iGen || match.first == iReco){
+        if((int)match.second == iGen || (int)match.first == iReco){
+            if(verbose_>2){
+                printf("zeroing match %u -> %u\n", match.second, match.first);
+            }
+            optimizer_->RemoveLimits(i);
             optimizer_->SetValue(i, 0);
             optimizer_->Fix(i);
             floating_[i] = false;
@@ -383,11 +376,12 @@ void matcher::testDrop(int iGen, int iReco){
     if(newchisq < savedchisq){
         if(verbose_){
             printf("dropping gen %d, reco %d improved chisq from %f to %f\n", iGen, iReco, savedchisq, newchisq);
+            std::cout << rawmat();
         }
     } else {
         if(verbose_){
             printf("dropping gen %d, reco %d worsened chisq from %f to %f\n", iGen, iReco, savedchisq, newchisq);
-            printf("\tresetting optimizer\n");
+            std::cout << rawmat();
         }
         optimizer_ = std::make_unique<MnMigrad>(*loss_, savedstate);
         for(unsigned i=0; i<floating_.size(); ++i){
