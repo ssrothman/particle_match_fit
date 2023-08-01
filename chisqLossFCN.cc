@@ -42,11 +42,14 @@ double ChisqLossFCN::operator()(const std::vector<double>& data) const {
         lossPHI = arma::accu(diffPHI % diffPHI);
     }
 
-    arma::vec lossPUvec = 2 * PUexp * arma::log(recoPT);
-    lossPUvec = arma::max(lossPUvec, arma::zeros<arma::vec>(NPReco));
-    lossPUvec += PUpenalty;
-    lossPUvec %= PU;
-    lossPU = arma::dot(lossPUvec, lossPUvec);
+    for(unsigned i=0; i<NPReco; ++i){
+        if(PU(i) == 0) continue;
+        double pt0 = PUpt0s[ids[i]];
+        double exp = PUexps[ids[i]];
+        double penalty = PUpenalties[ids[i]];
+
+        lossPU += 2*exp*std::max(std::log(recoPT(i)/pt0), 0.0) + penalty;
+    }
 
     return lossPT + lossETA + lossPHI + lossPU;
 };

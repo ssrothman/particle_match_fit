@@ -3,30 +3,30 @@
 
 #include "SRothman/SimonTools/src/jets.h"
 #include <memory>
-
-enum class matchFilterType{
-    DR = 0,
-    CHARGESIGN = 1,
-    CHARGE = 2,
-    REALISTIC = 3,
-    LOSTTRACK = 4
-};
+#include <string>
 
 class MatchingFilter{
     public:
         MatchingFilter(double threshold) : threshold_(threshold) {};
         virtual ~MatchingFilter(){};
-        virtual bool allowMatch(const particle& reco, const particle& gen, const jet& j) = 0;
+        virtual bool pass(const particle& reco, const particle& gen) = 0;
 
-        static std::shared_ptr<MatchingFilter> getFilter(const enum matchFilterType& behavior, double threshold);
-        static std::shared_ptr<MatchingFilter> getFilter(const enum matchFilterType& behavior, double threshold, double softPt, double hardPt);
+        static std::shared_ptr<MatchingFilter> getFilter(const std::string& behavior, double threshold);
 
-    protected:
-        bool passDR(const particle& reco, const particle& gen, const jet& j);
-        bool sameCharge(const particle& reco, const particle& gen, const jet& j);
-        bool sameChargeSign(const particle& reco, const particle& gen, const jet& j);
-    private:
         double threshold_;
+};
+
+class MatchingFilterEnsemble{
+    public:
+        MatchingFilterEnsemble(std::vector<std::string> behaviors, std::vector<double> thresholds);
+        
+        bool pass(const particle& reco, const particle& gen);
+
+        bool operator()(const particle& reco, const particle& gen){
+            return pass(reco, gen);
+        }
+
+        std::vector<std::shared_ptr<MatchingFilter>> filters;
 };
 
 #endif

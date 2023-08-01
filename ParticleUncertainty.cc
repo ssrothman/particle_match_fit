@@ -225,59 +225,59 @@ void StandardParticleUncertaintySmearedTracks::addUncertainty(particle& part, co
     }
 }
 
-std::shared_ptr<ParticleUncertainty> ParticleUncertainty::getUncertainty(const enum uncertaintyType& behavior){
-    switch(behavior){
-        case uncertaintyType::NAIVE:
-            return std::make_shared<NaiveParticleUncertainty>();
-        case uncertaintyType::STANDARD:
-        case uncertaintyType::SMEAREDTRACKS:
-            throw std::invalid_argument("StandardParticleUncertainty requires more parameters");
-        default:
-            throw std::invalid_argument("Unknown uncertainty type");
-
+std::shared_ptr<ParticleUncertainty> ParticleUncertainty::get(const std::string& behavior){
+    if(behavior == "Naive"){
+        return std::make_shared<NaiveParticleUncertainty>();
+    } else if(behavior == "Standard" || behavior == "SmearedTracks"){
+        throw std::invalid_argument("StandardParticleUncertainty requires more parameters");
+    } else {
+        throw std::invalid_argument("Unknown uncertainty type");
     }
 }
 
 
-std::shared_ptr<ParticleUncertainty> ParticleUncertainty::getUncertainty(
-        const enum uncertaintyType& behavior,
+std::shared_ptr<ParticleUncertainty> ParticleUncertainty::get(
+        const std::string& behavior,
         const std::vector<double>& EMstochastic,
         const std::vector<double>& EMnoise,
         const std::vector<double>& EMconstant,
-        const std::vector<double>& ECALgranularity,
+        const std::vector<double>& ECALgranularityEta,
+        const std::vector<double>& ECALgranularityPhi,
         const std::vector<double>& ECALEtaBoundaries,
         const std::vector<double>& HADstochastic,
         const std::vector<double>& HADconstant,
-        const std::vector<double>& HCALgranularity,
+        const std::vector<double>& HCALgranularityEta,
+        const std::vector<double>& HCALgranularityPhi,
         const std::vector<double>& HCALEtaBoundaries,
         const std::vector<double>& CHlinear,
         const std::vector<double>& CHconstant,
-        const std::vector<double>& CHMS,
-        const std::vector<double>& CHangular,
+        const std::vector<double>& CHMSeta,
+        const std::vector<double>& CHMSphi,
+        const std::vector<double>& CHangularEta,
+        const std::vector<double>& CHangularPhi,
         const std::vector<double>& trkEtaBoundaries){
-    switch(behavior){
-        case uncertaintyType::NAIVE:
-            return std::make_shared<NaiveParticleUncertainty>();
-        case uncertaintyType::STANDARD:
-            return std::make_shared<StandardParticleUncertainty>(
-                    EMstochastic, EMnoise, EMconstant,
-                    ECALgranularity, ECALEtaBoundaries, 
-                    HADstochastic, HADconstant, 
-                    HCALgranularity, HCALEtaBoundaries,
-                    CHlinear, CHconstant, 
-                    CHMS, CHangular,
-                    trkEtaBoundaries);
-        case uncertaintyType::SMEAREDTRACKS:
-            return std::make_shared<StandardParticleUncertaintySmearedTracks>(
-                    EMstochastic, EMnoise, EMconstant,
-                    ECALgranularity, ECALEtaBoundaries, 
-                    HADstochastic, HADconstant, 
-                    HCALgranularity, HCALEtaBoundaries,
-                    CHlinear, CHconstant, 
-                    CHMS, CHangular,
-                    trkEtaBoundaries);
-        default:
-            throw std::invalid_argument("Unknown uncertainty type");
 
+    if(behavior == "Naive"){
+        return std::make_shared<NaiveParticleUncertainty>();
+    } else if(behavior == "Standard"){
+        return std::make_shared<StandardParticleUncertainty>(
+                EMstochastic, EMnoise, EMconstant,
+                ECALgranularityEta, ECALEtaBoundaries, 
+                HADstochastic, HADconstant, 
+                HCALgranularityEta, HCALEtaBoundaries,
+                CHlinear, CHconstant, 
+                CHMSeta, CHangularEta,
+                trkEtaBoundaries);
+    } else if(behavior == "SmearedTracks"){
+        return std::make_shared<StandardParticleUncertaintySmearedTracks>(
+                EMstochastic, EMnoise, EMconstant,
+                ECALgranularityEta, ECALEtaBoundaries, 
+                HADstochastic, HADconstant, 
+                HCALgranularityEta, HCALEtaBoundaries,
+                CHlinear, CHconstant, 
+                CHMSeta, CHangularEta,
+                trkEtaBoundaries);
+    } else {
+        throw std::invalid_argument("Unknown uncertainty type");
     }
 }

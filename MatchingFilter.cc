@@ -2,114 +2,85 @@
 #include "matchingUtil.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 
+/*
+ * Options: (enumerated in .cc rather than .h to avoid recompilation)
+ *
+ * DR: 
+ */
+
+static bool passDR(const particle& reco, const particle& gen, double threshold){
+    return chisquared(reco, gen, false) < threshold;
+}
+
+static bool sameCharge(const particle& reco, const particle& gen){
+    return reco.charge == gen.charge;
+}
+
+static bool sameChargeMagnitude(const particle& reco, const particle& gen){
+    return std::abs(reco.charge) == std::abs(gen.charge);
+}
+
 class DRFilter : public MatchingFilter {
     public:
         DRFilter(double threshold) : MatchingFilter(threshold) {}
         ~DRFilter() override {};
-        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
-};
-
-class ChargeSignFilter : public MatchingFilter {
-    public:
-        ChargeSignFilter(double threshold) : MatchingFilter(threshold) {};
-        ~ChargeSignFilter() override {};
-        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
+        bool pass(const particle& reco, const particle& gen) override{
+            return passDR(reco, gen, threshold_);
+        }
 };
 
 class ChargeFilter : public MatchingFilter {
     public:
         ChargeFilter(double threshold) : MatchingFilter(threshold) {};
         ~ChargeFilter() override {};
-        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
+        bool pass(const particle& reco, const particle& gen) override{
+            return passDR(reco, gen, threshold_) && sameCharge(reco, gen);
+        }
 };
 
-class RealisticFilter : public MatchingFilter {
+class ChargeMagnitudeFilter : public MatchingFilter {
     public:
-        RealisticFilter(double threshold, double softPt, double hardPt) : 
-            MatchingFilter(threshold),
-            softPt_(softPt), hardPt_(hardPt) {};
-        ~RealisticFilter() override {};
-        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
-    private:
-        double softPt_, hardPt_;
+        ChargeMagnitudeFilter(double threshold) : MatchingFilter(threshold) {};
+        ~ChargeMagnitudeFilter() override {};
+        bool pass(const particle& reco, const particle& gen) override{
+            return passDR(reco, gen, threshold_) && sameChargeMagnitude(reco, gen);
+        }
 };
 
-class LostTrackFilter : public MatchingFilter {
-    public:
-        LostTrackFilter(double threshold):
-            MatchingFilter(threshold) {}
-        ~LostTrackFilter() override {};
-        bool allowMatch(const particle& reco, const particle& gen, const jet& j) override;
-};
-
-bool MatchingFilter::passDR(const particle& reco, const particle& gen, const jet& j){
-    return chisquared(reco, gen, false) < threshold_;
-}
-
-bool MatchingFilter::sameCharge(const particle& reco, const particle& gen, const jet& j){
-    return std::abs(reco.charge) == std::abs(gen.charge);
-}
-
-bool MatchingFilter::sameChargeSign(const particle& reco, const particle& gen, const jet& j){
-    return reco.charge == gen.charge;
-}
-
-bool DRFilter::allowMatch(const particle& reco, const particle& gen, const jet& j){
-    return passDR(reco, gen, j);
-}
-
-bool ChargeSignFilter::allowMatch(const particle& reco, const particle& gen, const jet& j){
-    return passDR(reco, gen, j) && sameChargeSign(reco, gen, j);
-}
-
-bool ChargeFilter::allowMatch(const particle& reco, const particle& gen, const jet& j){
-    return passDR(reco, gen, j) && sameCharge(reco, gen, j);
-}
-
-bool RealisticFilter::allowMatch(const particle& reco, const particle& gen, const jet& j){
-    if (reco.pt < softPt_){
-        return passDR(reco, gen, j);
-    } else if (reco.pt < hardPt_){
-        return passDR(reco, gen, j) && sameCharge(reco, gen, j);
+std::shared_ptr<MatchingFilter> MatchingFilter::getFilter(const std::string& behavior, double threshold){
+    if(behavior == "DR"){
+        return std::make_shared<DRFilter>(threshold);
+    } else if (behavior == "Charge"){
+        return std::make_shared<ChargeFilter>(threshold);
+    } else if (behavior == "ChargeMagnitude"){
+        return std::make_shared<ChargeMagnitudeFilter>(threshold);
     } else {
-        return passDR(reco, gen, j);
+        throw std::invalid_argument("Invalid matching filter type");
     }
 }
 
-bool LostTrackFilter::allowMatch(const particle& reco, const particle& gen, const jet& j){
-    return passDR(reco, gen, j) && (sameCharge(reco, gen, j) || gen.charge==0);
-}
+MatchingFilterEnsemble::MatchingFilterEnsemble(std::vector<std::string> behaviors, std::vector<double> thresholds){
+    if(behaviors.size() != thresholds.size()){
+        throw std::invalid_argument("Mismatched number of behaviors and thresholds");
+    }
 
-std::shared_ptr<MatchingFilter> MatchingFilter::getFilter(const enum matchFilterType& behavior, double threshold){
-    switch(behavior){
-        case matchFilterType::DR:
-            return std::make_shared<DRFilter>(threshold);
-        case matchFilterType::CHARGESIGN:
-            return std::make_shared<ChargeSignFilter>(threshold);
-        case matchFilterType::CHARGE:
-            return std::make_shared<ChargeFilter>(threshold);
-        case matchFilterType::REALISTIC:
-            throw std::invalid_argument("Realistic filter requires additional parameters");
-        case matchFilterType::LOSTTRACK:
-            return std::make_shared<LostTrackFilter>(threshold);
-        default:
-            throw std::invalid_argument("Invalid matching filter type");
+    if(behaviors.size() != 3){
+        throw std::invalid_argument("Ensemble must have shape [EM0, HAD0, CH]");
+    }
+
+    for(unsigned int i = 0; i < behaviors.size(); i++){
+        filters.push_back(MatchingFilter::getFilter(behaviors[i], thresholds[i]));
     }
 }
 
-std::shared_ptr<MatchingFilter> MatchingFilter::getFilter(const enum matchFilterType& behavior, double threshold, double softPt, double hardPt){
-    switch(behavior){
-        case matchFilterType::DR:
-            return std::make_shared<DRFilter>(threshold);
-        case matchFilterType::CHARGESIGN:
-            return std::make_shared<ChargeSignFilter>(threshold);
-        case matchFilterType::CHARGE:
-            return std::make_shared<ChargeFilter>(threshold);
-        case matchFilterType::REALISTIC:
-            return std::make_shared<RealisticFilter>(threshold, softPt, hardPt);
-        case matchFilterType::LOSTTRACK:
-            return std::make_shared<LostTrackFilter>(threshold);
-        default:
-            throw std::invalid_argument("Invalid matching filter type");
+bool MatchingFilterEnsemble::pass(const particle& reco, const particle& gen){
+    if(reco.pdgid==22){
+        return filters[0]->pass(reco, gen);
+    } else if(reco.pdgid==130){
+        return filters[1]->pass(reco, gen);
+    } else if(reco.charge!=0) {
+        return filters[2]->pass(reco, gen);
+    } else {
+        throw std::invalid_argument("Invalid particle type");
     }
 }

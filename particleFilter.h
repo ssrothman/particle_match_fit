@@ -4,15 +4,7 @@
 #include <vector>
 #include <memory>
 #include "SRothman/SimonTools/src/jets.h"
-
-enum class particleFilterType{
-    NONE = 0,
-    ALL = 1,
-    CHARGED = 2,
-    NEUTRAL = 3,
-    EM0 = 4,
-    HAD0 = 5
-};
+#include <string>
 
 class particleFilter{
 public:
@@ -20,7 +12,7 @@ public:
     virtual ~particleFilter(){};
     virtual bool pass(const particle& part) = 0;
 
-    static std::shared_ptr<particleFilter> getParticleFilter(particleFilterType type);
+    static std::shared_ptr<particleFilter> getParticleFilter(const std::string& type);
 };
 
 #endif

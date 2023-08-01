@@ -4,12 +4,7 @@
 #include "SRothman/SimonTools/src/jets.h"
 #include <vector>
 #include <memory>
-
-enum class uncertaintyType{
-    NAIVE = 0,
-    STANDARD = 1,
-    SMEAREDTRACKS = 2
-};
+#include <string>
 
 class ParticleUncertainty{
     public:
@@ -17,26 +12,30 @@ class ParticleUncertainty{
         virtual ~ParticleUncertainty(){};
         virtual void addUncertainty(particle& part, const jet& j) = 0;
 
-    static std::shared_ptr<ParticleUncertainty> getUncertainty(
-            const enum uncertaintyType& behavior);
+    static std::shared_ptr<ParticleUncertainty> get(
+            const std::string& behavior);
 
-    static std::shared_ptr<ParticleUncertainty> getUncertainty(
-            const enum uncertaintyType& behavior, 
+    static std::shared_ptr<ParticleUncertainty> get(
+            const std::string& behavior, 
             const std::vector<double>& EMstochastic, 
             const std::vector<double>& EMnoise,
             const std::vector<double>& EMconstant,
-            const std::vector<double>& ECALgranularity,
+            const std::vector<double>& ECALgranularityEta,
+            const std::vector<double>& ECALgranularityPhi,
             const std::vector<double>& ECALEtaBoundaries,
 
             const std::vector<double>& HADstochastic,
             const std::vector<double>& HADconstant,
-            const std::vector<double>& HCALgranularity,
+            const std::vector<double>& HCALgranularityEta,
+            const std::vector<double>& HCALgranularityPhi,
             const std::vector<double>& HCALEtaBoundaries,
 
             const std::vector<double>& CHlinear,
             const std::vector<double>& CHconstant,
-            const std::vector<double>& CHMS,
-            const std::vector<double>& CHangular,
+            const std::vector<double>& CHMSeta,
+            const std::vector<double>& CHMSphi,
+            const std::vector<double>& CHangularEta,
+            const std::vector<double>& CHangularPhi,
             const std::vector<double>& trkEtaBoundaries);
 };
 

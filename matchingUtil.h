@@ -6,6 +6,7 @@
 #include "SRothman/SimonTools/src/jets.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "SRothman/SimonTools/src/util.h"
+#include <string>
 
 template<typename T>
 T chisquared(const T& recopt, const T& recoeta, const T& recophi,

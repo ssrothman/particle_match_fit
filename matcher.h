@@ -7,6 +7,8 @@
 
 #include <armadillo>
 
+#include <string>
+
 #include <Minuit2/MnMigrad.h>
 #include <Minuit2/FunctionMinimum.h>
 
@@ -31,36 +33,40 @@ public:
                      double clipval, 
 
                      const enum spatialLoss& loss,
-                     const enum matchFilterType& filter,
-                     const enum uncertaintyType& uncertainty,
-                     const std::vector<enum prefitterType>& prefitters,
-                     const enum prefitRefinerType& refiner,
-                     const enum particleFilterType& dropGenFilter,
-                     const enum particleFilterType& dropRecoFilter,
+                     const std::vector<double>& PUpt0s,
+                     const std::vector<double>& PUexps, 
+                     const std::vector<double>& PUpenalties,
 
-                     double PUexp, double PUpenalty,
+                     const std::string& uncertainty,
+
+                     const std::vector<std::string>& filters,
+                     const std::vector<double>& cutoffs, 
+                     const std::vector<std::string>& prefitters,
+                     const std::string& refiner,
+                     const std::string& dropGenFilter,
+                     const std::string& dropRecoFilter,
 
                      bool recoverLostTracks,
-
-                     double cutoff, 
-
-                     double softPt=0, double hardPt=1e9,
 
                      const std::vector<double>& EMstochastic = {}, 
                      const std::vector<double>& EMnoise = {},
                      const std::vector<double>& EMconstant = {},
-                     const std::vector<double>& ECALgranularity = {},
+                     const std::vector<double>& ECALgranularityEta = {},
+                     const std::vector<double>& ECALgranularityPhi = {},
                      const std::vector<double>& ECALEtaBoundaries = {},
 
                      const std::vector<double>& HADstochastic = {},
                      const std::vector<double>& HADconstant = {},
-                     const std::vector<double>& HCALgranularity = {},
+                     const std::vector<double>& HCALgranularityEta = {},
+                     const std::vector<double>& HCALgranularityPhi = {},
                      const std::vector<double>& HCALEtaBoundaries = {},
 
                      const std::vector<double>& CHlinear = {},
                      const std::vector<double>& CHconstant = {},
-                     const std::vector<double>& CHMS = {},
-                     const std::vector<double>& CHangular = {},
+                     const std::vector<double>& CHMSeta = {},
+                     const std::vector<double>& CHMSphi = {},
+                     const std::vector<double>& CHangularEta = {},
+                     const std::vector<double>& CHangularPhi = {},
                      const std::vector<double>& trkEtaBoundaries = {},
 
                      unsigned maxReFit=50,
@@ -94,8 +100,8 @@ private:
     double clipval_;
 
     std::shared_ptr<ParticleUncertainty> uncertainty_;
-    std::shared_ptr<MatchingFilter> filter_;
-    std::vector<std::shared_ptr<prefitter>> prefitters_;
+    std::shared_ptr<MatchingFilterEnsemble> filters_;
+    std::shared_ptr<PrefitterEnsemble> prefitters_;
     std::shared_ptr<prefitRefiner> refiner_;
     std::shared_ptr<particleFilter> dropGenFilter_;
     std::shared_ptr<particleFilter> dropRecoFilter_;
@@ -104,7 +110,7 @@ private:
 
     unsigned maxReFit_;
 
-    double PUexp_, PUpenalty_;
+    std::vector<double> PUpt0s_, PUexps_, PUpenalties_;
     std::shared_ptr<ChisqLossFCN> loss_;
     std::shared_ptr<MnMigrad> optimizer_;
 

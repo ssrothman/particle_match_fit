@@ -14,10 +14,10 @@ class NONEprefitRefiner: public prefitRefiner{
         }
 };
 
-class GLOBAL_SINGLE_GENprefitRefiner: public prefitRefiner{
+class OneGenOneRecoprefitRefiner: public prefitRefiner{
     public:
-        GLOBAL_SINGLE_GENprefitRefiner() {}
-        ~GLOBAL_SINGLE_GENprefitRefiner() {}
+        OneGenOneRecoprefitRefiner() {}
+        ~OneGenOneRecoprefitRefiner() {}
 
         matchMap refine(const matchMap& recoToGen,
                         const jet& recojet,
@@ -50,10 +50,10 @@ class GLOBAL_SINGLE_GENprefitRefiner: public prefitRefiner{
         }
 };
 
-class SINGLE_GENprefitRefiner: public prefitRefiner{
+class OneGenOneRecoPerTypeprefitRefiner: public prefitRefiner{
     public:
-        SINGLE_GENprefitRefiner() {}
-        ~SINGLE_GENprefitRefiner() {}
+        OneGenOneRecoPerTypeprefitRefiner() {}
+        ~OneGenOneRecoPerTypeprefitRefiner() {}
 
         matchMap refine(const matchMap& recoToGen,
                         const jet& recojet,
@@ -121,15 +121,14 @@ prefitRefiner::matchMap prefitRefiner::invertMap(const matchMap& m) const {
     return inverted;
 }
 
-std::shared_ptr<prefitRefiner> prefitRefiner::getRefiner(const enum prefitRefinerType& behavior){
-    switch(behavior){
-        case prefitRefinerType::NONE:
-            return std::make_shared<NONEprefitRefiner>();
-        case prefitRefinerType::GLOBAL_SINGLE_GEN:
-            return std::make_shared<GLOBAL_SINGLE_GENprefitRefiner>();
-        case prefitRefinerType::SINGLE_GEN:
-            return std::make_shared<SINGLE_GENprefitRefiner>();
-        default:
-            throw std::runtime_error("Unknown prefitRefinerType");
+std::shared_ptr<prefitRefiner> prefitRefiner::get(const std::string& behavior){
+    if(behavior == "None"){
+        return std::make_shared<NONEprefitRefiner>();
+    } else if(behavior == "OneGenOneReco"){
+        return std::make_shared<OneGenOneRecoprefitRefiner>();
+    } else if(behavior == "OneGenOneRecoPerType"){
+        return std::make_shared<OneGenOneRecoPerTypeprefitRefiner>();
+    } else {
+        throw std::runtime_error("Unknown prefitRefinerType");
     }
 }

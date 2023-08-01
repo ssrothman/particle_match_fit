@@ -29,7 +29,9 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
 
     const enum spatialLoss type;
 
-    const double PUexp, PUpenalty;
+    const std::vector<double> PUpt0s, PUexps, PUpenalties;
+
+    std::vector<unsigned> ids;
 
   public:
     ChisqLossFCN() : 
@@ -40,13 +42,16 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         weightedGenETA(), weightedGenPHI(),
         locations(),
         type(TYPE1),
-        PUexp(0), PUpenalty(0){}
+        PUpt0s(), PUexps(), PUpenalties(),
+        ids() {}
 
     explicit ChisqLossFCN(const jet& recojet,
                           const jet& genjet,
                           const std::vector<std::pair<unsigned, unsigned>>& locations,
                           const enum spatialLoss type,
-                          double PUexp, double PUpenalty):
+                          const std::vector<double>& PUpt0s,
+                          const std::vector<double>& PUexps, 
+                          const std::vector<double>& PUpenalties):
       recoPT(recojet.ptvec()), 
       recoETA(recojet.etavec()), 
       recoPHI(recojet.phivec()),
@@ -61,7 +66,22 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
       weightedGenPHI(genPT % genPHI),
       locations(locations),
       type(type),
-      PUexp(PUexp), PUpenalty(PUpenalty){}
+      PUpt0s(PUpt0s),
+      PUexps(PUexps), PUpenalties(PUpenalties),
+      ids(){
+
+          for(const auto& part : recojet.particles){
+            if(part.pdgid == 22){
+                ids.emplace_back(0);
+            } else if(part.pdgid == 130){
+                ids.emplace_back(1);
+            } else if(part.charge != 0){
+                ids.emplace_back(2);
+            } else {
+                throw std::runtime_error("Unrecognized particle type in recojet");
+            }
+          }
+      }
 
     double operator()(const std::vector<double>& data) const override;
     

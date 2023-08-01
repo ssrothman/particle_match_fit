@@ -54,21 +54,53 @@ public:
     }
 };
 
-std::shared_ptr<particleFilter> particleFilter::getParticleFilter(particleFilterType type){
-    switch(type){
-        case particleFilterType::ALL:
-            return std::make_shared<ALLparticleFilter>();
-        case particleFilterType::NONE:
-            return std::make_shared<NONEparticleFilter>();
-        case particleFilterType::CHARGED:
-            return std::make_shared<CHARGEDparticleFilter>();
-        case particleFilterType::NEUTRAL:
-            return std::make_shared<NEUTRALparticleFilter>();
-        case particleFilterType::EM0:
-            return std::make_shared<EM0particleFilter>();
-        case particleFilterType::HAD0:
-            return std::make_shared<HAD0particleFilter>();
-        default:
-            throw std::runtime_error("particleFilter::getParticleFilter: Unknown particleFilterType");
+class EM0HAD0particleFilter : public particleFilter{
+public:
+    EM0HAD0particleFilter() {};
+    ~EM0HAD0particleFilter() {};
+    bool pass(const particle& part) override{
+        return part.pdgid == 22 || part.pdgid == 130;
+    }
+};
+
+class EM0CHARGEDparticleFilter : public particleFilter{
+public:
+    EM0CHARGEDparticleFilter() {};
+    ~EM0CHARGEDparticleFilter() {};
+    bool pass(const particle& part) override{
+        return part.pdgid == 22 || part.charge != 0;
+    }
+};
+
+class HAD0CHARGEDparticleFilter : public particleFilter{
+public:
+    HAD0CHARGEDparticleFilter() {};
+    ~HAD0CHARGEDparticleFilter() {};
+    bool pass(const particle& part) override{
+        return part.pdgid == 130 || part.charge != 0;
+    }
+};
+
+std::shared_ptr<particleFilter> particleFilter::getParticleFilter(const std::string& type){
+    if(type == "ALL"){
+        return std::make_shared<ALLparticleFilter>();
+    } else if(type == "NONE"){
+        return std::make_shared<NONEparticleFilter>();
+    } else if(type == "CHARGED"){
+        return std::make_shared<CHARGEDparticleFilter>();
+    } else if(type == "NEUTRAL"){
+        return std::make_shared<NEUTRALparticleFilter>();
+    } else if(type == "EM0"){
+        return std::make_shared<EM0particleFilter>();
+    } else if(type == "HAD0"){
+        return std::make_shared<HAD0particleFilter>();
+    } else if(type == "EM0HAD0"){
+        return std::make_shared<EM0HAD0particleFilter>();
+    } else if(type == "EM0CHARGED"){
+        return std::make_shared<EM0CHARGEDparticleFilter>();
+    } else if(type == "HAD0CHARGED"){
+        return std::make_shared<HAD0CHARGEDparticleFilter>();
+    } else {
+        throw std::runtime_error("particleFilter::getParticleFilter: Unknown particleFilterType");
     }
 }

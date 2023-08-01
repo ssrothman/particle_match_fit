@@ -7,36 +7,41 @@ matcher::matcher(const jet& recojet,
                  double clipval, 
    
                  const enum spatialLoss& loss,
-                 const enum matchFilterType& filter,
-                 const enum uncertaintyType& uncertainty,
-                 const std::vector<enum prefitterType>& prefitters,
-                 const enum prefitRefinerType& refiner,
-                 const enum particleFilterType& dropGenFilter,
-                 const enum particleFilterType& dropRecoFilter,
+                 const std::vector<double>& PUpt0s,
+                 const std::vector<double>& PUexps,
+                 const std::vector<double>& PUpenalties,
 
-                 double PUexp, double PUpenalty,
+                 const std::string& uncertainty,
+
+                 const std::vector<std::string>& filters,
+                 const std::vector<double>& cutoffs, 
+                 const std::vector<std::string>& prefitters,
+                 const std::string& refiner,
+                 const std::string& dropGenFilter,
+                 const std::string& dropRecoFilter,
 
                  bool recoverLostTracks,
    
-                 double cutoff, 
-   
-                 double softPt, double hardPt,
-   
+                 //uncertainty parameters
                  const std::vector<double>& EMstochastic, 
                  const std::vector<double>& EMnoise,
                  const std::vector<double>& EMconstant,
-                 const std::vector<double>& ECALgranularity,
+                 const std::vector<double>& ECALgranularityEta,
+                 const std::vector<double>& ECALgranularityPhi,
                  const std::vector<double>& ECALEtaBoundaries,
    
                  const std::vector<double>& HADstochastic,
                  const std::vector<double>& HADconstant,
-                 const std::vector<double>& HCALgranularity,
+                 const std::vector<double>& HCALgranularityEta,
+                 const std::vector<double>& HCALgranularityPhi,
                  const std::vector<double>& HCALEtaBoundaries,
    
                  const std::vector<double>& CHlinear,
                  const std::vector<double>& CHconstant,
-                 const std::vector<double>& CHMS,
-                 const std::vector<double>& CHangular,
+                 const std::vector<double>& CHMSeta,
+                 const std::vector<double>& CHMSphi,
+                 const std::vector<double>& CHangularEta,
+                 const std::vector<double>& CHangularPhi,
                  const std::vector<double>& trkEtaBoundaries,
    
                  unsigned maxReFit,
@@ -46,25 +51,30 @@ matcher::matcher(const jet& recojet,
             clipval_(clipval), 
             recoverLostTracks_(recoverLostTracks),
             maxReFit_(maxReFit), 
-            PUexp_(PUexp), PUpenalty_(PUpenalty),
+            PUpt0s_(PUpt0s),
+            PUexps_(PUexps), PUpenalties_(PUpenalties),
             verbose_(verbose), lossType_(loss) {
 
-    filter_ = MatchingFilter::getFilter(filter, cutoff, softPt, hardPt);
-    uncertainty_ = ParticleUncertainty::getUncertainty(uncertainty, 
-                                                       EMstochastic, EMnoise, EMconstant, ECALgranularity, ECALEtaBoundaries,
-                                                       HADstochastic, HADconstant, HCALgranularity, HCALEtaBoundaries,
-                                                       CHlinear, CHconstant, CHMS, CHangular, trkEtaBoundaries);
+    filters_ = std::make_unique<MatchingFilterEnsemble>(filters, cutoffs);
 
-    if(prefitters.size() !=3 ){
-        throw std::runtime_error("matcher: invalid prefitter vector is wrong size");
-    }
+    uncertainty_ = ParticleUncertainty::get(
+            uncertainty, 
+            EMstochastic, EMnoise, EMconstant, 
+            ECALgranularityEta, ECALgranularityPhi,
+            ECALEtaBoundaries,
 
-    prefitters_.resize(3);
-    for(unsigned i=0; i<3; ++i){
-        prefitters_[i] = prefitter::getPrefitter(prefitters[i], filter_);
-    }
+            HADstochastic, HADconstant, 
+            HCALgranularityEta, HCALgranularityPhi,
+            HCALEtaBoundaries,
 
-    refiner_ = prefitRefiner::getRefiner(refiner);
+            CHlinear, CHconstant, 
+            CHMSeta, CHMSphi,
+            CHangularEta, CHangularPhi,
+            trkEtaBoundaries);
+
+    prefitters_ = std::make_unique<PrefitterEnsemble>(prefitters, filters_);
+
+    refiner_ = prefitRefiner::get(refiner);
 
     dropGenFilter_ = particleFilter::getParticleFilter(dropGenFilter);
     dropRecoFilter_ = particleFilter::getParticleFilter(dropRecoFilter);
@@ -130,16 +140,7 @@ void matcher::doPrefit(){
     for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){//foreach reco particle
         particle& reco = recojet_.particles[iReco];
 
-        std::vector<unsigned> matchedgen;
-        if(reco.pdgid==22){
-            matchedgen = (*prefitters_[0])(reco, genjet_);
-        }else if(reco.pdgid==130){
-            matchedgen = (*prefitters_[1])(reco, genjet_);
-        } else if(reco.charge!=0){
-            matchedgen = (*prefitters_[2])(reco, genjet_);
-        } else {
-            throw std::runtime_error("matcher: invalid reco particle");
-        }
+        std::vector<unsigned> matchedgen = prefitters_->prefit(reco, genjet_);
 
         if(!matchedgen.empty()){
             recoToGen[iReco] = matchedgen;
@@ -164,7 +165,7 @@ void matcher::doPrefit(){
 
             for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
                 particle& reco = recojet_.particles[iReco];
-                if(filter_->allowMatch(reco, gencopy, recojet_)){
+                if(filters_->pass(reco, gencopy)){
                     recoToGen[iReco].push_back(iGen);
                     usedGen[iGen] = true;
                 }
@@ -216,7 +217,7 @@ void matcher::buildLoss(){
     loss_ = std::make_unique<ChisqLossFCN>(
             recojet_, genjet_, 
             fitlocations_, lossType_,
-            PUexp_, PUpenalty_);
+            PUpt0s_, PUexps_, PUpenalties_);
     if(verbose_>2){
         printf("loss mat\n");
         std::cout << rawmat();

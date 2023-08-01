@@ -2,30 +2,51 @@
 #include "SRothman/SimonTools/src/util.h"
 #include "matchingUtil.h"
 
-class NOMATCHprefitter: public prefitter{
+class Prefitter{
+    public:
+        Prefitter(std::shared_ptr<MatchingFilter> filter) :
+            filter_(filter) {}
+        virtual ~Prefitter() {};
+
+        std::vector<unsigned> operator()(const particle& part, const jet& j){
+            return prefit(part, j);
+        }
+
+        virtual std::vector<unsigned> prefit(const particle& part, const jet& j)=0;
+
+        static std::shared_ptr<Prefitter> get(const std::string& behavior, 
+                            std::shared_ptr<MatchingFilter> filter);
+
+
+    protected:
+        std::shared_ptr<MatchingFilter> filter_;
+};
+
+
+class NOMATCHprefitter: public Prefitter{
     public:
         NOMATCHprefitter(std::shared_ptr<MatchingFilter> filter) :
-            prefitter(filter) {};
+            Prefitter(filter) {};
         ~NOMATCHprefitter() {};
 
-        std::vector<unsigned> operator()(const particle& part, const jet& j) override {
+        std::vector<unsigned> prefit(const particle& part, const jet& j) override {
             return {};
         }
 };
 
-class CLOSESTprefitter : public prefitter{
+class CLOSESTprefitter : public Prefitter{
     public:
         CLOSESTprefitter(std::shared_ptr<MatchingFilter> filter):
-            prefitter(filter) {};
+            Prefitter(filter) {};
         ~CLOSESTprefitter() {};
 
-        std::vector<unsigned> operator()(const particle& part, const jet& genjet) override {
-            double minDR = 99999;
+        std::vector<unsigned> prefit(const particle& part, const jet& genjet) override {
+            double minDR =std::numeric_limits<double>::infinity();
             int bestIdx = -1;
 
             for(unsigned i=0; i<genjet.nPart; ++i){
                 const particle& genpart = genjet.particles[i];
-                if(filter_->allowMatch(part, genpart, genjet)){
+                if(filter_->pass(part, genpart)){
                     double dR = dR2(part.eta, part.phi, 
                                     genpart.eta, genpart.phi);
                     if(dR<minDR || bestIdx==-1){
@@ -42,19 +63,19 @@ class CLOSESTprefitter : public prefitter{
         }
 };
 
-class HARDESTprefitter : public prefitter{
+class HARDESTprefitter : public Prefitter{
     public:
         HARDESTprefitter(std::shared_ptr<MatchingFilter> filter):
-            prefitter(filter) {};
+            Prefitter(filter) {};
         ~HARDESTprefitter() {};
 
-        std::vector<unsigned> operator()(const particle& part, const jet& genjet) override {
-            double maxPt = 0;
+        std::vector<unsigned> prefit(const particle& part, const jet& genjet) override {
+            double maxPt = -std::numeric_limits<double>::infinity();
             int bestIdx = -1;
 
             for(unsigned i=0; i<genjet.nPart; ++i){
                 const particle& genpart = genjet.particles[i];
-                if(filter_->allowMatch(part, genpart, genjet)){
+                if(filter_->pass(part, genpart)){
                     if(genpart.pt>maxPt || bestIdx==-1){
                         maxPt = genpart.pt;
                         bestIdx = i;
@@ -69,13 +90,13 @@ class HARDESTprefitter : public prefitter{
         }
 };
 
-class BESTprefitter : public prefitter{
+class BESTprefitter : public Prefitter{
     public:
         BESTprefitter(std::shared_ptr<MatchingFilter> filter):
-            prefitter(filter) {};
+            Prefitter(filter) {};
         ~BESTprefitter() {};
 
-        std::vector<unsigned> operator()(const particle& part, const jet& j) override {
+        std::vector<unsigned> prefit(const particle& part, const jet& j) override {
             double minChisq = std::numeric_limits<double>::infinity();
             int bestIdx = -1;
 
@@ -83,7 +104,7 @@ class BESTprefitter : public prefitter{
                 const particle& genpart = j.particles[i];
             
 
-                if(filter_->allowMatch(part, genpart, j)){
+                if(filter_->pass(part, genpart)){
                     double chisq = chisquared(part, genpart, true);
 
                     if(chisq < minChisq || bestIdx==-1){
@@ -100,17 +121,17 @@ class BESTprefitter : public prefitter{
         }
 };
 
-class FLOATprefitter : public prefitter{
+class FLOATprefitter : public Prefitter{
     public:
         FLOATprefitter(std::shared_ptr<MatchingFilter> filter):
-            prefitter(filter) {};
+            Prefitter(filter) {};
         ~FLOATprefitter() {};
 
-        std::vector<unsigned> operator()(const particle& part, const jet& j) override {
+        std::vector<unsigned> prefit(const particle& part, const jet& j) override {
             std::vector<unsigned> result;
             for(unsigned i=0; i<j.nPart; ++i){
                 const particle& genpart = j.particles[i];
-                if(filter_->allowMatch(part, genpart, j)){
+                if(filter_->pass(part, genpart)){
                     result.push_back(i);
                 } 
             }
@@ -118,21 +139,43 @@ class FLOATprefitter : public prefitter{
         }
 };
 
-std::shared_ptr<prefitter> prefitter::getPrefitter(const enum prefitterType& behavior, 
+std::shared_ptr<Prefitter> Prefitter::get(const std::string& behavior, 
                                                     std::shared_ptr<MatchingFilter> filter){
-    switch(behavior){
-        case prefitterType::NOMATCH:
-            return std::make_shared<NOMATCHprefitter>(filter);
-        case prefitterType::CLOSEST:
-            return std::make_shared<CLOSESTprefitter>(filter);
-        case prefitterType::HARDEST:
-            return std::make_shared<HARDESTprefitter>(filter);
-        case prefitterType::BEST:
-            return std::make_shared<BESTprefitter>(filter);
-        case prefitterType::FLOAT:
-            return std::make_shared<FLOATprefitter>(filter);
-        default:
-            throw std::invalid_argument("Invalid prefitter type");
+    if(behavior == "NoMatch"){
+        return std::make_shared<NOMATCHprefitter>(filter);
+    } else if(behavior == "Closest"){
+        return std::make_shared<CLOSESTprefitter>(filter);
+    } else if(behavior == "Hardest"){
+        return std::make_shared<HARDESTprefitter>(filter);
+    } else if(behavior == "Best"){
+        return std::make_shared<BESTprefitter>(filter);
+    } else if(behavior == "Float"){
+        return std::make_shared<FLOATprefitter>(filter);
+    } else {
+        throw std::invalid_argument("Invalid prefitter type");
     }
 }
 
+PrefitterEnsemble::PrefitterEnsemble(const std::vector<std::string>& behaviors, 
+                                    std::shared_ptr<MatchingFilterEnsemble> filter){
+
+    if(behaviors.size() != 3){
+        throw std::invalid_argument("Must have inputs shape [EM0, HAD0, CH]");
+    }
+
+    for(unsigned i=0; i<behaviors.size(); ++i){
+        prefitters_.push_back(Prefitter::get(behaviors[i], filter->filters[i]));
+    }
+}
+
+std::vector<unsigned> PrefitterEnsemble::prefit(const particle& part, const jet& j){
+    if(part.pdgid==22){
+        return prefitters_[0]->prefit(part, j);
+    } else if(part.pdgid==130){
+        return prefitters_[1]->prefit(part, j);
+    } else if(part.charge != 0) {
+        return prefitters_[2]->prefit(part, j);
+    } else {
+        throw std::invalid_argument("Invalid particle type");
+    }
+}
