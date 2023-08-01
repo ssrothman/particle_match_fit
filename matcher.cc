@@ -326,9 +326,9 @@ void matcher::greedyDropParticles(bool gen){
     
     for(unsigned i=0; i<maxI; ++i){
         if(gen && dropGenFilter_->pass(genjet_.particles[maxI-i-1])){
-            testDrop(i, -1);
+            testDrop(maxI-i-1, -1);
         } else if (!gen && dropRecoFilter_->pass(recojet_.particles[maxI-i-1])) {
-            testDrop(-1, i);
+            testDrop(-1, maxI-i-1);
         }
     }
 }
