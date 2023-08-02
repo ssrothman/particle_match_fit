@@ -1,5 +1,18 @@
 #include "particleFilter.h"
 
+/*
+ * Options:
+ *  ALL
+ *  NONE
+ *  CHARGED
+ *  NEUTRAL
+ *  EM0
+ *  HAD0
+ *  EM0HAD0
+ *  EM0CHARGED
+ *  HAD0CHARGED
+ */
+
 class ALLparticleFilter : public particleFilter{
 public:
     ALLparticleFilter() {};
