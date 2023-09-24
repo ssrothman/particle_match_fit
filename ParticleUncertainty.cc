@@ -177,7 +177,7 @@ void RealisticParticleUncertainty::addUncertaintyToNeutralHadron(particle& part)
     part.deta = part.dphi;
 }
 
-void RealisticParticleUncertainty::addUncertaintyToCharged(particle & part){
+void RealisticParticleUncertainty::addUncertaintyToCharged(particle& part){
     int region = getEtaRegion(part.eta, trkEtaBoundaries_);
 
     double trkRes = trkResolution(part.pt, CHlinear_[region], CHconstant_[region]);

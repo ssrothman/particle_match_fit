@@ -127,8 +127,17 @@ arma::mat matcher::ptrans() const {
 }
 
 void matcher::fillUncertainties(){
+    if(verbose_>1){
+        printf("\nUNCERTAINTIES:\n");
+    }
     for(particle& p : recojet_.particles){
         uncertainty_->addUncertainty(p, recojet_); 
+        if(verbose_>1){
+            printf("(%0.5f, %0.5f, %0.5f)\n", p.dpt, p.deta, p.dphi);
+        }
+    }
+    if(verbose_>1){
+        printf("\n");
     }
 }
 
@@ -140,6 +149,9 @@ void matcher::doPrefit(){
     for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){//foreach reco particle
         particle& reco = recojet_.particles[iReco];
 
+        if(verbose_ > 9){
+            printf("reco %u\n", iReco);
+        }
         std::vector<unsigned> matchedgen = prefitters_->prefit(reco, genjet_);
 
         if(!matchedgen.empty()){
@@ -156,18 +168,28 @@ void matcher::doPrefit(){
                 continue;
             }
             const particle& gen = genjet_.particles[iGen];
-            if(gen.charge==0){
+            if(gen.charge==0 || gen.pdgid == 211){//missed muon tracks are gone for good
                 continue;
             }
 
+            if(verbose_ > 9){
+                printf("recovering gen %u\n", iGen);
+            }
             particle gencopy(gen);
             gencopy.charge = 0;
 
             for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
                 particle& reco = recojet_.particles[iReco];
                 if(filters_->pass(reco, gencopy)){
+                    if(verbose_>9){
+                        printf("\treco %u: pass\n", iReco);
+                    }
                     recoToGen[iReco].push_back(iGen);
                     usedGen[iGen] = true;
+                } else {
+                    if(verbose_>9){
+                        printf("\treco %u: fail\n", iReco);
+                    }
                 }
             }
         }

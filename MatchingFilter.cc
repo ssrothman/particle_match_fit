@@ -8,15 +8,28 @@
  * DR: 
  */
 
+//#define DEBUG
+
 static bool passDR(const particle& reco, const particle& gen, double threshold){
-    return chisquared(reco, gen, false) < threshold;
+    double chisq = chisquared(reco, gen, false);
+#ifdef DEBUG
+    printf("\t\tchisq = %0.5f\n", chisq);
+    printf("\t\t\t(%0.2f, %0.2f) -> (%0.2f, %0.2f)\n", reco.eta, reco.phi, gen.eta, gen.phi);
+#endif
+    return chisq < threshold;
 }
 
 static bool sameCharge(const particle& reco, const particle& gen){
+#ifdef DEBUG
+    printf("\t\treco.charge = %d, gen.charge = %d\n", reco.charge, gen.charge);
+#endif
     return reco.charge == gen.charge;
 }
 
 static bool sameChargeMagnitude(const particle& reco, const particle& gen){
+#ifdef DEBUG
+    printf("\t\treco.charge = %d, gen.charge = %d\n", reco.charge, gen.charge);
+#endif
     return std::abs(reco.charge) == std::abs(gen.charge);
 }
 

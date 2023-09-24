@@ -2,6 +2,8 @@
 #include "SRothman/SimonTools/src/util.h"
 #include "matchingUtil.h"
 
+//#define DEBUG
+
 class Prefitter{
     public:
         Prefitter(std::shared_ptr<MatchingFilter> filter) :
@@ -111,7 +113,15 @@ class BESTprefitter : public Prefitter{
                         minChisq = chisq;
                         bestIdx = i;
                     }
+#ifdef DEBUG
+                    printf("\tgen %u: pass\n", i);
+#endif
                 } 
+                else {
+#ifdef DEBUG
+                    printf("\tgen %u: fail\n", i);
+#endif
+                }
             }
             if(bestIdx<0){
                 return {};
@@ -132,8 +142,15 @@ class FLOATprefitter : public Prefitter{
             for(unsigned i=0; i<j.nPart; ++i){
                 const particle& genpart = j.particles[i];
                 if(filter_->pass(part, genpart)){
+#ifdef DEBUG
+                    printf("\tgen %u: pass\n", i);
+#endif
                     result.push_back(i);
-                } 
+                } else {
+#ifdef DEBUG
+                    printf("\tgen %u: fail\n", i);
+#endif
+                }
             }
             return result;
         }
