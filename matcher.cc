@@ -120,6 +120,8 @@ arma::mat matcher::ptrans() const {
         std::cout << genjet_.ptvec().t();
         printf("ptrans * GEN\n");
         std::cout << (ans * genjet_.ptvec()).t();
+        printf("rawmat * GEN\n");
+        std::cout << (rawmat() * genjet_.ptvec()).t();
         printf("RECO\n");
         std::cout << (recojet_.ptvec()).t();
     }
@@ -243,6 +245,8 @@ void matcher::buildLoss(){
     if(verbose_>2){
         printf("loss mat\n");
         std::cout << rawmat();
+        printf("fitlocations.size() = %lu\n", fitlocations_.size());
+        fflush(stdout);
         printf("loss = %f\n", loss_->operator()(std::vector<double>(fitlocations_.size(), 1.0)));
     }
 }
@@ -345,17 +349,18 @@ void matcher::refineFit(){
 
 void matcher::greedyDropParticles(bool gen){
     unsigned maxI = gen ? genjet_.nPart : recojet_.nPart;
-    
+
+        
     for(unsigned i=0; i<maxI; ++i){
         if(gen && dropGenFilter_->pass(genjet_.particles[maxI-i-1])){
-            testDrop(maxI-i-1, -1);
+            testDrop(maxI-i-1, -1, false);
         } else if (!gen && dropRecoFilter_->pass(recojet_.particles[maxI-i-1])) {
-            testDrop(-1, maxI-i-1);
+            testDrop(-1, maxI-i-1, true);
         }
     }
 }
 
-void matcher::testDrop(int iGen, int iReco){
+void matcher::testDrop(int iGen, int iReco, bool allowInducedPU){
     if(!optimizer_){
         return;
     }
@@ -363,6 +368,10 @@ void matcher::testDrop(int iGen, int iReco){
     if(iGen<0 && iReco<0){
         return;
     }
+
+    arma::mat Araw_initial = rawmat();
+    arma::vec PU_initial = arma::conv_to<arma::vec>::from(
+            (Araw_initial * genjet_.ptvec()) == 0);
 
     MnUserParameters savedstate = optimizer_->Parameters();
     double savedchisq = chisq();
@@ -391,7 +400,12 @@ void matcher::testDrop(int iGen, int iReco){
     
     double newchisq = chisq();
 
-    if(newchisq < savedchisq){
+    arma::mat Araw_final = rawmat();
+    arma::vec PU_final = arma::conv_to<arma::vec>::from(
+            (Araw_final * genjet_.ptvec()) == 0);
+    bool PUchanged = arma::any(PU_initial != PU_final);
+
+    if(newchisq < savedchisq && (!PUchanged || allowInducedPU)){
         if(verbose_){
             printf("dropping gen %d, reco %d improved chisq from %f to %f\n", iGen, iReco, savedchisq, newchisq);
             std::cout << rawmat();

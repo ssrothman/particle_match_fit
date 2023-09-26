@@ -90,7 +90,7 @@ private:
 
     void refineFit();
     void greedyDropParticles(bool gen);
-    void testDrop(int iGen, int iReco);
+    void testDrop(int iGen, int iReco, bool allowInducedPU);
 
     jet recojet_, genjet_;
 
