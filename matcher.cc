@@ -24,7 +24,6 @@ matcher::matcher(const jet& recojet,
    
                  //uncertainty parameters
                  const std::vector<double>& EMstochastic, 
-                 const std::vector<double>& EMnoise,
                  const std::vector<double>& EMconstant,
                  const std::vector<double>& ECALgranularityEta,
                  const std::vector<double>& ECALgranularityPhi,
@@ -59,7 +58,7 @@ matcher::matcher(const jet& recojet,
 
     uncertainty_ = ParticleUncertainty::get(
             uncertainty, 
-            EMstochastic, EMnoise, EMconstant, 
+            EMstochastic, EMconstant, 
             ECALgranularityEta, ECALgranularityPhi,
             ECALEtaBoundaries,
 

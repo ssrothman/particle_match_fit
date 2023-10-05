@@ -18,7 +18,6 @@ class ParticleUncertainty{
     static std::shared_ptr<ParticleUncertainty> get(
             const std::string& behavior, 
             const std::vector<double>& EMstochastic, 
-            const std::vector<double>& EMnoise,
             const std::vector<double>& EMconstant,
             const std::vector<double>& ECALgranularityEta,
             const std::vector<double>& ECALgranularityPhi,

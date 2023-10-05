@@ -176,8 +176,8 @@ std::shared_ptr<Prefitter> Prefitter::get(const std::string& behavior,
 PrefitterEnsemble::PrefitterEnsemble(const std::vector<std::string>& behaviors, 
                                     std::shared_ptr<MatchingFilterEnsemble> filter){
 
-    if(behaviors.size() != 3){
-        throw std::invalid_argument("Must have inputs shape [EM0, HAD0, CH]");
+    if(behaviors.size() != 5){
+        throw std::invalid_argument("Must have inputs shape [EM0, HAD0, HADCH, ELE, MU]");
     }
 
     for(unsigned i=0; i<behaviors.size(); ++i){
@@ -188,11 +188,16 @@ PrefitterEnsemble::PrefitterEnsemble(const std::vector<std::string>& behaviors,
 std::vector<unsigned> PrefitterEnsemble::prefit(const particle& part, const jet& j){
     if(part.pdgid==22){
         return prefitters_[0]->prefit(part, j);
-    } else if(part.pdgid==130){
+    } else if(part.pdgid >= 100 && part.charge == 0){
         return prefitters_[1]->prefit(part, j);
-    } else if(part.charge != 0) {
+    } else if(part.pdgid >= 100 && part.charge != 0) {
         return prefitters_[2]->prefit(part, j);
+    } else if(part.pdgid == 11) {
+        return prefitters_[3]->prefit(part, j);
+    } else if(part.pdgid == 13) {
+        return prefitters_[4]->prefit(part, j);
     } else {
-        throw std::invalid_argument("Invalid particle type");
+        printf("the bad pdgid, charge = %d, %d\n", part.pdgid, part.charge);
+        throw std::invalid_argument("Invalid particle type in PrefitterEnsemble");
     }
 }

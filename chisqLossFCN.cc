@@ -1,6 +1,48 @@
 #include "chisqLossFCN.h"
 #include "matchingUtil.h"
 
+ChisqLossFCN::ChisqLossFCN(const jet& recojet,
+                          const jet& genjet,
+                          const std::vector<std::pair<unsigned, unsigned>>& locations,
+                          const enum spatialLoss type,
+                          const std::vector<double>& PUpt0s,
+                          const std::vector<double>& PUexps, 
+                          const std::vector<double>& PUpenalties):
+      recoPT(recojet.ptvec()), 
+      recoETA(recojet.etavec()), 
+      recoPHI(recojet.phivec()),
+      genPT(genjet.ptvec()), 
+      genETA(genjet.etavec()), 
+      genPHI(genjet.phivec()),
+      errPT(recojet.dptvec()), 
+      errETA(recojet.detavec()), 
+      errPHI(recojet.dphivec()),
+      NPReco(recoPT.size()), NPGen(genPT.size()),
+      weightedGenETA(genPT % genETA), 
+      weightedGenPHI(genPT % genPHI),
+      locations(locations),
+      type(type),
+      PUpt0s(PUpt0s),
+      PUexps(PUexps), PUpenalties(PUpenalties),
+      ids(){
+
+    for(const auto& part : recojet.particles){
+        if(part.pdgid == 22){
+            ids.emplace_back(0);
+        } else if(part.pdgid == 130){
+            ids.emplace_back(1);
+        } else if(part.pdgid == 211){
+            ids.emplace_back(2);
+        } else if(part.pdgid == 11){
+            ids.emplace_back(3);
+        } else if(part.pdgid == 13){
+            ids.emplace_back(4);
+        } else {
+            throw std::runtime_error("Unrecognized particle type in recojet");
+        }
+    }
+}
+
 double ChisqLossFCN::operator()(const std::vector<double>& data) const {
     //printf("top of loss\n");
     //fflush(stdout);

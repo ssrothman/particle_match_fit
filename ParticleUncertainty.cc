@@ -28,7 +28,6 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
     public:
         RealisticParticleUncertainty(
                 const std::vector<double>& EMstochastic,
-                const std::vector<double>& EMnoise,
                 const std::vector<double>& EMconstant,
                 const std::vector<double>& ECALgranularity,
                 const std::vector<double>& ECALEtaBoundaries,
@@ -42,7 +41,6 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
                 const std::vector<double>& CHangular,
                 const std::vector<double>& trkEtaBoundaries) :
             EMstochastic_(EMstochastic),
-            EMnoise_(EMnoise),
             EMconstant_(EMconstant),
             ECALgranularity_(ECALgranularity),
             ECALEtaBoundaries_(ECALEtaBoundaries),
@@ -60,7 +58,7 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
         void addUncertaintyToNeutralHadron(particle& part);
         void addUncertaintyToCharged(particle& part);
 
-        std::vector<double> EMstochastic_, EMnoise_, EMconstant_;
+        std::vector<double> EMstochastic_, EMconstant_;
         std::vector<double> ECALgranularity_;
         std::vector<double> ECALEtaBoundaries_;
 
@@ -77,7 +75,6 @@ class StandardParticleUncertainty : public RealisticParticleUncertainty {
     public:
         StandardParticleUncertainty(
                 const std::vector<double>& EMstochastic,
-                const std::vector<double>& EMnoise,
                 const std::vector<double>& EMconstant,
                 const std::vector<double>& ECALgranularity,
                 const std::vector<double>& ECALEtaBoundaries,
@@ -91,7 +88,7 @@ class StandardParticleUncertainty : public RealisticParticleUncertainty {
                 const std::vector<double>& CHangular,
                 const std::vector<double>& trkEtaBoundaries) :
             RealisticParticleUncertainty(
-                    EMstochastic, EMnoise, EMconstant,
+                    EMstochastic, EMconstant,
                     ECALgranularity, ECALEtaBoundaries, 
                     HADstochastic, HADconstant, 
                     HCALgranularity, HCALEtaBoundaries,
@@ -106,7 +103,6 @@ class StandardParticleUncertaintySmearedTracks : public RealisticParticleUncerta
     public:
         StandardParticleUncertaintySmearedTracks(
                 const std::vector<double>& EMstochastic,
-                const std::vector<double>& EMnoise,
                 const std::vector<double>& EMconstant,
                 const std::vector<double>& ECALgranularity,
                 const std::vector<double>& ECALEtaBoundaries,
@@ -120,7 +116,7 @@ class StandardParticleUncertaintySmearedTracks : public RealisticParticleUncerta
                 const std::vector<double>& CHangular,
                 const std::vector<double>& trkEtaBoundaries) :
             RealisticParticleUncertainty(
-                    EMstochastic, EMnoise, EMconstant,
+                    EMstochastic, EMconstant,
                     ECALgranularity, ECALEtaBoundaries, 
                     HADstochastic, HADconstant, 
                     HCALgranularity, HCALEtaBoundaries,
@@ -142,9 +138,9 @@ static int getEtaRegion(const double& eta, const std::vector<double>& boundaries
     return boundaries.size();
 }
 
-static double caloResolution(const double& eta, const double& pt, const double& A, const double& B, const double& C){
+static double caloResolution(const double& eta, const double& pt, const double& A, const double& C){
     double E = pt * std::cosh(eta);
-    return std::sqrt(square(A/std::sqrt(E)) + square(B/E) + square(C)) * pt;
+    return std::sqrt(square(A/std::sqrt(E)) + square(C)) * pt;
 }
 
 static double trkResolution(const double& pt, const double& A, const double& B){
@@ -164,7 +160,7 @@ void NaiveParticleUncertainty::addUncertainty(particle& part, const jet& j){
 void RealisticParticleUncertainty::addUncertaintyToNeutralEM(particle& part){
     int region = getEtaRegion(part.eta, ECALEtaBoundaries_);
 
-    part.dpt = caloResolution(part.eta, part.pt, EMstochastic_[region], EMnoise_[region], EMconstant_[region]);
+    part.dpt = caloResolution(part.eta, part.pt, EMstochastic_[region], EMconstant_[region]);
     part.dphi = ECALgranularity_[region];
     part.deta = part.dphi;
 }
@@ -172,7 +168,7 @@ void RealisticParticleUncertainty::addUncertaintyToNeutralEM(particle& part){
 void RealisticParticleUncertainty::addUncertaintyToNeutralHadron(particle& part){
     int region = getEtaRegion(part.eta, HCALEtaBoundaries_);
 
-    part.dpt = caloResolution(part.eta, part.pt, HADstochastic_[region], 0, HADconstant_[region]);
+    part.dpt = caloResolution(part.eta, part.pt, HADstochastic_[region], HADconstant_[region]);
     part.dphi = HCALgranularity_[region];
     part.deta = part.dphi;
 }
@@ -185,12 +181,10 @@ void RealisticParticleUncertainty::addUncertaintyToCharged(particle& part){
     if(part.pdgid==11){
         caloRes = caloResolution(part.eta, part.pt, 
                                         EMstochastic_[region], 
-                                        EMnoise_[region], 
                                         EMconstant_[region]);
     } else if(part.pdgid!=13){//muons are tracker-only objects
         caloRes = caloResolution(part.eta, part.pt, 
                                 HADstochastic_[region], 
-                                0, 
                                 HADconstant_[region]);
     }
 
@@ -239,7 +233,6 @@ std::shared_ptr<ParticleUncertainty> ParticleUncertainty::get(const std::string&
 std::shared_ptr<ParticleUncertainty> ParticleUncertainty::get(
         const std::string& behavior,
         const std::vector<double>& EMstochastic,
-        const std::vector<double>& EMnoise,
         const std::vector<double>& EMconstant,
         const std::vector<double>& ECALgranularityEta,
         const std::vector<double>& ECALgranularityPhi,
@@ -261,7 +254,7 @@ std::shared_ptr<ParticleUncertainty> ParticleUncertainty::get(
         return std::make_shared<NaiveParticleUncertainty>();
     } else if(behavior == "Standard"){
         return std::make_shared<StandardParticleUncertainty>(
-                EMstochastic, EMnoise, EMconstant,
+                EMstochastic, EMconstant,
                 ECALgranularityEta, ECALEtaBoundaries, 
                 HADstochastic, HADconstant, 
                 HCALgranularityEta, HCALEtaBoundaries,
@@ -270,7 +263,7 @@ std::shared_ptr<ParticleUncertainty> ParticleUncertainty::get(
                 trkEtaBoundaries);
     } else if(behavior == "SmearedTracks"){
         return std::make_shared<StandardParticleUncertaintySmearedTracks>(
-                EMstochastic, EMnoise, EMconstant,
+                EMstochastic, EMconstant,
                 ECALgranularityEta, ECALEtaBoundaries, 
                 HADstochastic, HADconstant, 
                 HCALgranularityEta, HCALEtaBoundaries,
