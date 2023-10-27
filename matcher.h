@@ -39,14 +39,19 @@ public:
 
                      const std::string& uncertainty,
 
-                     const std::vector<std::string>& filters,
-                     const std::vector<double>& cutoffs, 
+                     const std::vector<std::string>& softflavorfilters,
+                     const std::vector<std::string>& hardflavorfilters,
+                     const std::vector<double>& filterthresholds,
+
+                     const std::vector<std::string>& chargefilters,
+
                      const std::vector<std::string>& prefitters,
                      const std::string& refiner,
                      const std::string& dropGenFilter,
                      const std::string& dropRecoFilter,
 
                      bool recoverLostTracks,
+                     const std::vector<double>& minRecoverPts, //[EM0, HAD0]
 
                      const std::vector<double>& EMstochastic = {}, 
                      const std::vector<double>& EMconstant = {},
@@ -67,6 +72,18 @@ public:
                      const std::vector<double>& CHangularEta = {},
                      const std::vector<double>& CHangularPhi = {},
                      const std::vector<double>& trkEtaBoundaries = {},
+
+                     const std::vector<double>& EM0thresholds = {},
+                     const std::vector<double>& HAD0thresholds = {},
+                     const std::vector<double>& HADCHthresholds = {},
+                     const std::vector<double>& ELEthresholds = {},
+                     const std::vector<double>& MUthresholds = {},
+
+                     const std::vector<double>& EM0dRcuts = {},
+                     const std::vector<double>& HAD0dRcuts = {},
+                     const std::vector<double>& HADCHdRcuts = {},
+                     const std::vector<double>& ELEdRcuts = {},
+                     const std::vector<double>& MUdRcuts = {},
 
                      unsigned maxReFit=50,
                      int verbose=0);
@@ -106,6 +123,7 @@ private:
     std::shared_ptr<particleFilter> dropRecoFilter_;
 
     bool recoverLostTracks_;
+    std::vector<double> minRecoverPts_;
 
     unsigned maxReFit_;
 

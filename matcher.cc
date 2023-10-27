@@ -13,14 +13,19 @@ matcher::matcher(const jet& recojet,
 
                  const std::string& uncertainty,
 
-                 const std::vector<std::string>& filters,
-                 const std::vector<double>& cutoffs, 
+                 const std::vector<std::string>& softflavorfilters,
+                 const std::vector<std::string>& hardflavorfilters,
+                 const std::vector<double>& filterthresholds,
+
+                 const std::vector<std::string>& chargefilters,
+
                  const std::vector<std::string>& prefitters,
                  const std::string& refiner,
                  const std::string& dropGenFilter,
                  const std::string& dropRecoFilter,
 
                  bool recoverLostTracks,
+                 const std::vector<double>& minRecoverPts,
    
                  //uncertainty parameters
                  const std::vector<double>& EMstochastic, 
@@ -43,18 +48,47 @@ matcher::matcher(const jet& recojet,
                  const std::vector<double>& CHangularPhi,
                  const std::vector<double>& trkEtaBoundaries,
    
+                 const std::vector<double>& EM0thresholds,
+                 const std::vector<double>& HAD0thresholds,
+                 const std::vector<double>& HADCHthresholds,
+                 const std::vector<double>& ELEthresholds,
+                 const std::vector<double>& MUthresholds,
+
+                 const std::vector<double>& EM0dRcuts,
+                 const std::vector<double>& HAD0dRcuts,
+                 const std::vector<double>& HADCHdRcuts,
+                 const std::vector<double>& ELEdRcuts,
+                 const std::vector<double>& MUdRcuts,
+
                  unsigned maxReFit,
                  int verbose) :
 
             recojet_(recojet), genjet_(genjet),
             clipval_(clipval), 
             recoverLostTracks_(recoverLostTracks),
+            minRecoverPts_(minRecoverPts),
             maxReFit_(maxReFit), 
             PUpt0s_(PUpt0s),
             PUexps_(PUexps), PUpenalties_(PUpenalties),
             verbose_(verbose), lossType_(loss) {
 
-    filters_ = std::make_unique<MatchingFilterEnsemble>(filters, cutoffs);
+    if (minRecoverPts_.size() != 2){
+        throw std::invalid_argument("minRecoverPts must have shape [EM0, HAD0]");
+    }
+
+    filters_ = std::make_unique<MatchingFilterEnsemble>(
+            softflavorfilters,
+            hardflavorfilters,
+            filterthresholds,
+
+            chargefilters,
+
+            EM0thresholds, HAD0thresholds, 
+            HADCHthresholds, ELEthresholds, MUthresholds,
+            EM0dRcuts, HAD0dRcuts,
+            HADCHdRcuts, ELEdRcuts, MUdRcuts,
+
+            ECALEtaBoundaries, HCALEtaBoundaries, trkEtaBoundaries);
 
     uncertainty_ = ParticleUncertainty::get(
             uncertainty, 
@@ -99,8 +133,8 @@ arma::mat matcher::ptrans() const {
 
     arma::vec genpt = genjet_.ptvec();
     arma::vec recpt = recojet_.ptvec();
-    genpt/=arma::accu(genpt);
-    recpt/=arma::accu(recpt);
+    genpt/=genjet_.sumpt;
+    recpt/=recojet_.sumpt;
 
     arma::vec predpt = ans * genpt;
 
@@ -116,13 +150,13 @@ arma::mat matcher::ptrans() const {
         printf("ptrans:\n");
         std::cout << ans;
         printf("GEN\n");
-        std::cout << genjet_.ptvec().t();
+        std::cout << genpt.t();
         printf("ptrans * GEN\n");
-        std::cout << (ans * genjet_.ptvec()).t();
+        std::cout << (ans * genpt).t();
         printf("rawmat * GEN\n");
-        std::cout << (rawmat() * genjet_.ptvec()).t();
+        std::cout << (rawmat() * genpt).t();
         printf("RECO\n");
-        std::cout << (recojet_.ptvec()).t();
+        std::cout << recpt.t();
     }
     return ans;
 }
@@ -169,7 +203,7 @@ void matcher::doPrefit(){
                 continue;
             }
             const particle& gen = genjet_.particles[iGen];
-            if(gen.charge==0 || gen.pdgid == 211){//missed muon tracks are gone for good
+            if(gen.charge==0 || gen.pdgid == 13){//missed muon tracks are gone for good
                 continue;
             }
 
@@ -178,6 +212,17 @@ void matcher::doPrefit(){
             }
             particle gencopy(gen);
             gencopy.charge = 0;
+            if(gencopy.pdgid==11){
+                gencopy.pdgid = 22;
+                if(gencopy.pt < minRecoverPts_[0]){
+                    continue;
+                }
+            } else {
+                gencopy.pdgid = 130;
+                if(gencopy.pt < minRecoverPts_[1]){
+                    continue;
+                }
+            }
 
             for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
                 particle& reco = recojet_.particles[iReco];

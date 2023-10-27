@@ -1,5 +1,6 @@
 #include "ParticleUncertainty.h"
 #include "SRothman/SimonTools/src/util.h"
+#include "SRothman/SimonTools/src/etaRegion.h"
 
 class NaiveParticleUncertainty : public ParticleUncertainty {
     public:
@@ -126,17 +127,6 @@ class StandardParticleUncertaintySmearedTracks : public RealisticParticleUncerta
         ~StandardParticleUncertaintySmearedTracks() override {}
         void addUncertainty(particle& part, const jet& j) override;
 };
-
-
-
-static int getEtaRegion(const double& eta, const std::vector<double>& boundaries){
-    for(unsigned i=0; i<boundaries.size(); ++i){
-        if(std::abs(eta) < boundaries[i]){
-            return i-1;
-        }
-    }
-    return boundaries.size();
-}
 
 static double caloResolution(const double& eta, const double& pt, const double& A, const double& C){
     double E = pt * std::cosh(eta);

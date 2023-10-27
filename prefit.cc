@@ -181,7 +181,7 @@ PrefitterEnsemble::PrefitterEnsemble(const std::vector<std::string>& behaviors,
     }
 
     for(unsigned i=0; i<behaviors.size(); ++i){
-        prefitters_.push_back(Prefitter::get(behaviors[i], filter->filters[i]));
+        prefitters_.push_back(Prefitter::get(behaviors[i], filter));
     }
 }
 
