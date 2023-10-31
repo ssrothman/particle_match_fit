@@ -1,5 +1,6 @@
 #include "matcher.h"
 #include "matchingUtil.h"
+#include "SRothman/SimonTools/src/etaRegion.h"
 
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
@@ -25,7 +26,11 @@ matcher::matcher(const jet& recojet,
                  const std::string& dropRecoFilter,
 
                  bool recoverLostTracks,
-                 const std::vector<double>& minRecoverPts,
+                 const std::vector<double>& HADCHrecoverThresholds,
+                 const std::vector<double>& ELErecoverThresholds,
+
+                 bool recoverLostHAD0,
+                 const std::vector<double>& HAD0recoverThresholds,
    
                  //uncertainty parameters
                  const std::vector<double>& EMstochastic, 
@@ -65,16 +70,18 @@ matcher::matcher(const jet& recojet,
 
             recojet_(recojet), genjet_(genjet),
             clipval_(clipval), 
+            trkEtaBoundaries_(trkEtaBoundaries),
+            ECALEtaBoundaries_(ECALEtaBoundaries),
+            HCALEtaBoundaries_(HCALEtaBoundaries),
             recoverLostTracks_(recoverLostTracks),
-            minRecoverPts_(minRecoverPts),
+            HADCHrecoverThresholds_(HADCHrecoverThresholds),
+            ELErecoverThresholds_(ELErecoverThresholds),
+            recoverLostHAD0_(recoverLostHAD0),
+            HAD0recoverThresholds_(HAD0recoverThresholds),
             maxReFit_(maxReFit), 
             PUpt0s_(PUpt0s),
             PUexps_(PUexps), PUpenalties_(PUpenalties),
             verbose_(verbose), lossType_(loss) {
-
-    if (minRecoverPts_.size() != 2){
-        throw std::invalid_argument("minRecoverPts must have shape [EM0, HAD0]");
-    }
 
     filters_ = std::make_unique<MatchingFilterEnsemble>(
             softflavorfilters,
@@ -197,45 +204,63 @@ void matcher::doPrefit(){
         }
     }//end foreach reco
 
-    if(recoverLostTracks_){
-        for(unsigned iGen=0; iGen<genjet_.particles.size(); ++iGen){
-            if(usedGen[iGen]){
-                continue;
-            }
-            const particle& gen = genjet_.particles[iGen];
-            if(gen.charge==0 || gen.pdgid == 13){//missed muon tracks are gone for good
-                continue;
-            }
+    for(unsigned iGen=0; iGen<genjet_.particles.size(); ++iGen){
+        if(usedGen[iGen]){
+            continue;
+        }
+        const particle& gen = genjet_.particles[iGen];
 
-            if(verbose_ > 9){
-                printf("recovering gen %u\n", iGen);
+        if(gen.pdgid==22 || gen.pdgid==13){//can't recover photons or muons
+            continue;
+        }
+
+        bool recover=false;
+        if(recoverLostTracks_){
+            int etaRegion = getEtaRegion(gen.eta, trkEtaBoundaries_);
+            if(gen.pdgid==11){
+                recover = recover || (gen.pt > ELErecoverThresholds_[etaRegion]);
+            } else if(gen.pdgid>=100 && gen.charge!=0){
+                recover = recover || (gen.pt > HADCHrecoverThresholds_[etaRegion]);
             }
-            particle gencopy(gen);
+        }
+
+        if(recoverLostHAD0_){
+            int etaRegion = getEtaRegion(gen.eta, HCALEtaBoundaries_);
+            if(gen.pdgid>=100 && gen.charge==0){
+                recover = recover || (gen.pt > HAD0recoverThresholds_[etaRegion]);
+            }
+        }
+
+        if(!recover){
+            continue;
+        }
+
+        if(verbose_ > 9){
+            printf("recovering gen %u\n", iGen);
+        }
+        particle gencopy(gen);
+        if(gencopy.charge == 0 && gencopy.pdgid>=100){
+            gencopy.pdgid = 22;
+        } else if(gencopy.charge != 0){
             gencopy.charge = 0;
             if(gencopy.pdgid==11){
                 gencopy.pdgid = 22;
-                if(gencopy.pt < minRecoverPts_[0]){
-                    continue;
-                }
-            } else {
+            } else if(gencopy.pdgid>=100){
                 gencopy.pdgid = 130;
-                if(gencopy.pt < minRecoverPts_[1]){
-                    continue;
-                }
             }
+        }
 
-            for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
-                particle& reco = recojet_.particles[iReco];
-                if(filters_->pass(reco, gencopy)){
-                    if(verbose_>9){
-                        printf("\treco %u: pass\n", iReco);
-                    }
-                    recoToGen[iReco].push_back(iGen);
-                    usedGen[iGen] = true;
-                } else {
-                    if(verbose_>9){
-                        printf("\treco %u: fail\n", iReco);
-                    }
+        for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
+            particle& reco = recojet_.particles[iReco];
+            if(filters_->pass(reco, gencopy)){
+                if(verbose_>9){
+                    printf("\treco %u: pass\n", iReco);
+                }
+                recoToGen[iReco].push_back(iGen);
+                usedGen[iGen] = true;
+            } else {
+                if(verbose_>9){
+                    printf("\treco %u: fail\n", iReco);
                 }
             }
         }

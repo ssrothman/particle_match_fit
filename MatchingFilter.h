@@ -3,7 +3,7 @@
 
 #include "SRothman/SimonTools/src/jets.h"
 #include <memory>
-#include <string>
+#include <string> 
 
 class MatchingFilter{
     public:
@@ -38,7 +38,7 @@ class MatchingFilterEnsemble : public MatchingFilter{
                 const std::vector<double>& ECALEtaBoundaries,
                 const std::vector<double>& HCALEtaBoundaries,
                 const std::vector<double>& trkEtaBoundaries);
-        
+
         bool pass(const particle& reco, const particle& gen);
 
         bool operator()(const particle& reco, const particle& gen){

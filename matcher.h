@@ -51,7 +51,11 @@ public:
                      const std::string& dropRecoFilter,
 
                      bool recoverLostTracks,
-                     const std::vector<double>& minRecoverPts, //[EM0, HAD0]
+                     const std::vector<double>& HADCHrecoverThresholds,
+                     const std::vector<double>& ELErecoverThresholds,
+
+                     bool recoverLostHAD0,
+                     const std::vector<double>& HAD0recoverThresholds,
 
                      const std::vector<double>& EMstochastic, 
                      const std::vector<double>& EMconstant,
@@ -122,8 +126,16 @@ private:
     std::shared_ptr<particleFilter> dropGenFilter_;
     std::shared_ptr<particleFilter> dropRecoFilter_;
 
+    std::vector<double> trkEtaBoundaries_;
+    std::vector<double> ECALEtaBoundaries_;
+    std::vector<double> HCALEtaBoundaries_;
+
     bool recoverLostTracks_;
-    std::vector<double> minRecoverPts_;
+    std::vector<double> HADCHrecoverThresholds_;
+    std::vector<double> ELErecoverThresholds_;
+
+    bool recoverLostHAD0_;
+    std::vector<double> HAD0recoverThresholds_;
 
     unsigned maxReFit_;
 

@@ -8,6 +8,9 @@
  */
 
 //#define DEBUG
+#ifdef CMSSW_GIT_HASH
+
+#endif
 
 class DRFilter : public MatchingFilter {
     public:
@@ -15,13 +18,7 @@ class DRFilter : public MatchingFilter {
                  const std::vector<double> thresholds) : 
             MatchingFilter(),
             thresholds_(thresholds),
-            etaBoundaries_(etaBoundaries) {
-                /*printf("\nDRFilter: etaBoundaries_ = ");
-                for (auto& eta : etaBoundaries_){
-                    printf("%f, ", eta);
-                }
-                printf("\n");*/
-            }
+            etaBoundaries_(etaBoundaries) {}
         ~DRFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
             int region = getEtaRegion(reco.eta, etaBoundaries_);
