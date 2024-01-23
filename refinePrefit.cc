@@ -1,6 +1,7 @@
 #include "refinePrefit.h"
 #include "matchingUtil.h"
 #include "SRothman/SimonTools/src/util.h"
+#include "SRothman/SimonTools/src/isID.h"
 
 class NONEprefitRefiner: public prefitRefiner{
     public:
@@ -75,12 +76,12 @@ class OneGenOneRecoPerTypeprefitRefiner: public prefitRefiner{
                 for(unsigned iReco : matches.second){
                     const auto& recopart = recojet.particles[iReco];
                     double thischisq = chisquared(recopart,genpart, false);
-                    if(recopart.pdgid == 22){
+                    if(isEM0(recopart)){
                         if(thischisq < bestChisqEM0){
                             bestChisqEM0 = thischisq;
                             bestIdxEM0 = iReco;
                         }
-                    } else if(recopart.pdgid == 130){
+                    } else if(isHAD0(recopart)){
                         if(thischisq < bestChisqHAD0){
                             bestChisqHAD0 = thischisq;
                             bestIdxHAD0 = iReco;

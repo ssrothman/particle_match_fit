@@ -1,4 +1,5 @@
 #include "chisqLossFCN.h"
+#include "SRothman/SimonTools/src/isID.h"
 #include "matchingUtil.h"
 
 ChisqLossFCN::ChisqLossFCN(const jet& recojet,
@@ -27,15 +28,15 @@ ChisqLossFCN::ChisqLossFCN(const jet& recojet,
       ids(){
 
     for(const auto& part : recojet.particles){
-        if(part.pdgid == 22){
+        if(isEM0(part)){
             ids.emplace_back(0);
-        } else if(part.pdgid == 130){
+        } else if(isHAD0(part)){
             ids.emplace_back(1);
-        } else if(part.pdgid == 211){
+        } else if(isHADCH(part)){
             ids.emplace_back(2);
-        } else if(part.pdgid == 11){
+        } else if(isELE(part)){
             ids.emplace_back(3);
-        } else if(part.pdgid == 13){
+        } else if(isMU(part)){
             ids.emplace_back(4);
         } else {
             throw std::runtime_error("Unrecognized particle type in recojet");

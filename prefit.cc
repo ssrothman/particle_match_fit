@@ -1,6 +1,7 @@
 #include "prefit.h"
 #include "SRothman/SimonTools/src/util.h"
 #include "matchingUtil.h"
+#include "SRothman/SimonTools/src/isID.h"
 
 //#define DEBUG
 
@@ -186,15 +187,15 @@ PrefitterEnsemble::PrefitterEnsemble(const std::vector<std::string>& behaviors,
 }
 
 std::vector<unsigned> PrefitterEnsemble::prefit(const particle& part, const jet& j){
-    if(part.pdgid==22){
+    if(isEM0(part)){
         return prefitters_[0]->prefit(part, j);
-    } else if(part.pdgid >= 100 && part.charge == 0){
+    } else if(isHAD0(part)){
         return prefitters_[1]->prefit(part, j);
-    } else if(part.pdgid >= 100 && part.charge != 0) {
+    } else if(isHADCH(part)) {
         return prefitters_[2]->prefit(part, j);
-    } else if(part.pdgid == 11) {
+    } else if(isELE(part)) {
         return prefitters_[3]->prefit(part, j);
-    } else if(part.pdgid == 13) {
+    } else if(isMU(part)) {
         return prefitters_[4]->prefit(part, j);
     } else {
         printf("the bad pdgid, charge = %d, %d\n", part.pdgid, part.charge);

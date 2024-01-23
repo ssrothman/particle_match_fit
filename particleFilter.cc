@@ -1,4 +1,5 @@
 #include "particleFilter.h"
+#include "SRothman/SimonTools/src/isID.h"
 
 /*
  * Options:
@@ -54,7 +55,7 @@ public:
     EM0particleFilter() {};
     ~EM0particleFilter() {};
     bool pass(const particle& part) override{
-        return part.pdgid == 22;
+        return isEM0(part);
     }
 };
 
@@ -63,7 +64,7 @@ public:
     HAD0particleFilter() {};
     ~HAD0particleFilter() {};
     bool pass(const particle& part) override{
-        return part.pdgid == 130;
+        return isHAD0(part);
     }
 };
 
@@ -72,7 +73,7 @@ public:
     EM0HAD0particleFilter() {};
     ~EM0HAD0particleFilter() {};
     bool pass(const particle& part) override{
-        return part.pdgid == 22 || part.pdgid == 130;
+        return isEM0(part) || isHAD0(part);
     }
 };
 
@@ -81,7 +82,7 @@ public:
     EM0CHARGEDparticleFilter() {};
     ~EM0CHARGEDparticleFilter() {};
     bool pass(const particle& part) override{
-        return part.pdgid == 22 || part.charge != 0;
+        return isEM0(part) || part.charge != 0;
     }
 };
 
@@ -90,7 +91,7 @@ public:
     HAD0CHARGEDparticleFilter() {};
     ~HAD0CHARGEDparticleFilter() {};
     bool pass(const particle& part) override{
-        return part.pdgid == 130 || part.charge != 0;
+        return isHAD0(part) || part.charge != 0;
     }
 };
 

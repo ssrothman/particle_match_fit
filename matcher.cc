@@ -1,6 +1,10 @@
 #include "matcher.h"
 #include "matchingUtil.h"
 #include "SRothman/SimonTools/src/etaRegion.h"
+#include "SRothman/SimonTools/src/isID.h"
+
+#include "CommonTools/BaseParticlePropagator/interface/RawParticle.h"
+#include "CommonTools/BaseParticlePropagator/interface/BaseParticlePropagator.h"
 
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
@@ -20,14 +24,18 @@ matcher::matcher(const jet& recojet,
 
                  const std::vector<std::string>& chargefilters,
 
+                 const std::vector<std::string>& dRfilters,
+
                  const std::vector<std::string>& prefitters,
                  const std::string& refiner,
                  const std::string& dropGenFilter,
                  const std::string& dropRecoFilter,
 
                  bool recoverLostTracks,
+                 bool propagateLostTracks,
                  const std::vector<double>& HADCHrecoverThresholds,
                  const std::vector<double>& ELErecoverThresholds,
+                 double Bz,
 
                  bool recoverLostHAD0,
                  const std::vector<double>& HAD0recoverThresholds,
@@ -59,11 +67,25 @@ matcher::matcher(const jet& recojet,
                  const std::vector<double>& ELEthresholds,
                  const std::vector<double>& MUthresholds,
 
-                 const std::vector<double>& EM0dRcuts,
-                 const std::vector<double>& HAD0dRcuts,
-                 const std::vector<double>& HADCHdRcuts,
-                 const std::vector<double>& ELEdRcuts,
-                 const std::vector<double>& MUdRcuts,
+                 const std::vector<double>& EM0constDR,
+                 const std::vector<double>& EM0floatDR,
+                 const std::vector<double>& EM0capDR,
+
+                 const std::vector<double>& HAD0constDR,
+                 const std::vector<double>& HAD0floatDR,
+                 const std::vector<double>& HAD0capDR,
+
+                 const std::vector<double>& HADCHconstDR,
+                 const std::vector<double>& HADCHfloatDR,
+                 const std::vector<double>& HADCHcapDR,
+
+                 const std::vector<double>& ELEconstDR,
+                 const std::vector<double>& ELEfloatDR,
+                 const std::vector<double>& ELEcapDR,
+
+                 const std::vector<double>& MUconstDR,
+                 const std::vector<double>& MUfloatDR,
+                 const std::vector<double>& MUcapDR,
 
                  unsigned maxReFit,
                  int verbose) :
@@ -74,8 +96,10 @@ matcher::matcher(const jet& recojet,
             ECALEtaBoundaries_(ECALEtaBoundaries),
             HCALEtaBoundaries_(HCALEtaBoundaries),
             recoverLostTracks_(recoverLostTracks),
+            propagateLostTracks_(propagateLostTracks),
             HADCHrecoverThresholds_(HADCHrecoverThresholds),
             ELErecoverThresholds_(ELErecoverThresholds),
+            Bz_(Bz),
             recoverLostHAD0_(recoverLostHAD0),
             HAD0recoverThresholds_(HAD0recoverThresholds),
             maxReFit_(maxReFit), 
@@ -92,10 +116,18 @@ matcher::matcher(const jet& recojet,
 
             EM0thresholds, HAD0thresholds, 
             HADCHthresholds, ELEthresholds, MUthresholds,
-            EM0dRcuts, HAD0dRcuts,
-            HADCHdRcuts, ELEdRcuts, MUdRcuts,
 
-            ECALEtaBoundaries, HCALEtaBoundaries, trkEtaBoundaries);
+            dRfilters,
+            
+            EM0constDR, EM0floatDR, EM0capDR,
+            HAD0constDR, HAD0floatDR, HAD0capDR,
+            HADCHconstDR, HADCHfloatDR, HADCHcapDR,
+            ELEconstDR, ELEfloatDR, ELEcapDR,
+            MUconstDR, MUfloatDR, MUcapDR,
+
+            ECALEtaBoundaries, 
+            HCALEtaBoundaries, 
+            trkEtaBoundaries);
 
     uncertainty_ = ParticleUncertainty::get(
             uncertainty, 
@@ -188,6 +220,7 @@ void matcher::doPrefit(){
 
     std::unordered_map<unsigned, std::vector<unsigned>> recoToGen;
 
+
     for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){//foreach reco particle
         particle& reco = recojet_.particles[iReco];
 
@@ -210,23 +243,42 @@ void matcher::doPrefit(){
         }
         const particle& gen = genjet_.particles[iGen];
 
-        if(gen.pdgid==22 || gen.pdgid==13){//can't recover photons or muons
+        if(isEM0(gen) || isMU(gen)){//can't recover photons or muons
             continue;
         }
 
         bool recover=false;
         if(recoverLostTracks_){
             int etaRegion = getEtaRegion(gen.eta, trkEtaBoundaries_);
-            if(gen.pdgid==11){
+            if(etaRegion >= (int)trkEtaBoundaries_.size()-1){ //this can happen because genjets cluster in rapidity
+                                                              //in this case the particle will be out of acceptance anyway
+                                                              //so we can just skip it for recovery
+                continue;
+            }
+            if(etaRegion < 0 || etaRegion >= (int)trkEtaBoundaries_.size()-1){
+                printf("BIG PROBLEM: TRK ETA REGION OUT OF BOUNDS\n");
+                printf("etaRegion: %d\n", etaRegion);
+                printf("gen eta: %0.5f\n", gen.eta);
+                printf("genjet eta: %0.5f\n", genjet_.eta);
+                throw std::runtime_error("TRK ETA REGION OUT OF BOUNDS");
+            }
+            if(isELE(gen)){
                 recover = recover || (gen.pt > ELErecoverThresholds_[etaRegion]);
-            } else if(gen.pdgid>=100 && gen.charge!=0){
+            } else if(isHADCH(gen)){
                 recover = recover || (gen.pt > HADCHrecoverThresholds_[etaRegion]);
             }
         }
 
         if(recoverLostHAD0_){
-            int etaRegion = getEtaRegion(gen.eta, HCALEtaBoundaries_);
-            if(gen.pdgid>=100 && gen.charge==0){
+            if(isHAD0(gen)){
+                int etaRegion = getEtaRegion(gen.eta, HCALEtaBoundaries_);
+                if(etaRegion < 0 || etaRegion >= (int)HCALEtaBoundaries_.size()-1){
+                    printf("BIG PROBLEM: HCAL ETA REGION OUT OF BOUNDS\n");
+                    printf("etaRegion: %d\n", etaRegion);
+                    printf("gen eta: %0.5f\n", gen.eta);
+                    printf("genjet eta: %0.5f\n", genjet_.eta);
+                    throw std::runtime_error("HCAL ETA REGION OUT OF BOUNDS");
+                }
                 recover = recover || (gen.pt > HAD0recoverThresholds_[etaRegion]);
             }
         }
@@ -239,14 +291,38 @@ void matcher::doPrefit(){
             printf("recovering gen %u\n", iGen);
         }
         particle gencopy(gen);
-        if(gencopy.charge == 0 && gencopy.pdgid>=100){
+        if(isHAD0(gen)){
             gencopy.pdgid = 22;
         } else if(gencopy.charge != 0){
+
+            RawParticle tmppart;
+            tmppart.setVertex(0, 0, 0, 0);
+            double px = gen.pt * cos(gen.phi);
+            double py = gen.pt * sin(gen.phi);
+            double pz = gen.pt * sinh(gen.eta);
+            double E = sqrt(px*px + py*py + pz*pz);
+            tmppart.setMomentum(px, py, pz, E);
+            tmppart.setCharge(gen.charge);
+
+            BaseParticlePropagator prop(tmppart, 0, 0, 0);
+            prop.setMagneticField(Bz_);
+
             gencopy.charge = 0;
-            if(gencopy.pdgid==11){
+            if(isELE(gen)){
                 gencopy.pdgid = 22;
-            } else if(gencopy.pdgid>=100){
+                if(propagateLostTracks_){
+                    prop.propagateToEcalEntrance();
+                }
+            } else if(isHADCH(gen)){
                 gencopy.pdgid = 130;
+                if(propagateLostTracks_){
+                    prop.propagateToHcalEntrance();
+                }
+            }
+            if(propagateLostTracks_){
+                gencopy.eta = prop.particle().eta();
+                gencopy.phi = prop.particle().phi();
+                gencopy.pt = prop.particle().pt();
             }
         }
 
@@ -307,6 +383,10 @@ void matcher::buildLoss(){
         printf("buildLoss()\n");
     }
 
+    if(fitlocations_.size()==0){
+        return;
+    }
+
     loss_ = std::make_unique<ChisqLossFCN>(
             recojet_, genjet_, 
             fitlocations_, lossType_,
@@ -324,6 +404,9 @@ void matcher::initializeOptimizer(){
     if(verbose_>1)
         printf("initializeOptimizer()\n");
     if(fitlocations_.size()==0){
+        return;
+    }
+    if(!loss_){
         return;
     }
     MnUserParameters starting;
@@ -403,6 +486,9 @@ void matcher::iterativelyClip(){
 }
 
 double matcher::chisq() const{
+    if(!loss_){
+        return 0;
+    }
     if(!optimizer_){
         return loss_->operator()(std::vector<double>({}));
     }
@@ -430,7 +516,7 @@ void matcher::greedyDropParticles(bool gen){
 }
 
 void matcher::testDrop(int iGen, int iReco, bool allowInducedPU){
-    if(!optimizer_){
+    if(!optimizer_ || !loss_){
         return;
     }
 

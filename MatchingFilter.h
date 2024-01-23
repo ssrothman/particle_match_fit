@@ -11,7 +11,21 @@ class MatchingFilter{
         virtual ~MatchingFilter(){};
         virtual bool pass(const particle& reco, const particle& gen) = 0;
 
-        static std::shared_ptr<MatchingFilter> getFilter(const std::string& behavior);
+        static std::shared_ptr<MatchingFilter> getFilter(
+                const std::string& behavior);
+        static std::shared_ptr<MatchingFilter> getDRFilter(
+                const std::string& behavior, 
+                const std::vector<double>& etaBoundaries,
+                const std::vector<double>& thresholds);
+        static std::shared_ptr<MatchingFilter> getDRFilter(
+                const std::string& behavior, 
+                const std::vector<double>& etaBoundaries,
+                const std::vector<double>& hardTerm, 
+                const std::vector<double>& invTerm,
+                const std::vector<double>& capTerm);
+        static std::shared_ptr<MatchingFilter> getThresholdFilter(
+                const std::vector<double>& boundaries, 
+                const std::vector<double>& thresholds);
 };
 
 class MatchingFilterEnsemble : public MatchingFilter{
@@ -23,17 +37,34 @@ class MatchingFilterEnsemble : public MatchingFilter{
 
                 const std::vector<std::string>& chargebehaviors,
 
+
                 const std::vector<double>& EM0thresholds,
                 const std::vector<double>& HAD0thresholds,
                 const std::vector<double>& HADCHthresholds,
                 const std::vector<double>& ELEthresholds,
                 const std::vector<double>& MUthresholds,
 
-                const std::vector<double>& EM0dRcuts,
-                const std::vector<double>& HAD0dRcuts,
-                const std::vector<double>& HADCHdRcuts,
-                const std::vector<double>& ELEdRcuts,
-                const std::vector<double>& MUdRcuts,
+                const std::vector<std::string>& dRbehaviors,
+
+                const std::vector<double>& EM0constDR,
+                const std::vector<double>& EM0floatDR,
+                const std::vector<double>& EM0capDR,
+
+                const std::vector<double>& HAD0constDR,
+                const std::vector<double>& HAD0floatDR,
+                const std::vector<double>& HAD0capDR,
+
+                const std::vector<double>& HADCHconstDR,
+                const std::vector<double>& HADCHfloatDR,
+                const std::vector<double>& HADCHcapDR,
+
+                const std::vector<double>& ELEconstDR,
+                const std::vector<double>& ELEfloatDR,
+                const std::vector<double>& ELEcapDR,
+
+                const std::vector<double>& MUconstDR,
+                const std::vector<double>& MUfloatDR,
+                const std::vector<double>& MUcapDR,
 
                 const std::vector<double>& ECALEtaBoundaries,
                 const std::vector<double>& HCALEtaBoundaries,
@@ -45,16 +76,18 @@ class MatchingFilterEnsemble : public MatchingFilter{
             return pass(reco, gen);
         }
 
-        std::vector<std::shared_ptr<MatchingFilter>> softflavorfilters;
-        std::vector<std::shared_ptr<MatchingFilter>> hardflavorfilters;
-        std::vector<double> behaviorthresholds;
+        static int pdgidToIndex(const particle& p);
 
-        std::vector<std::shared_ptr<MatchingFilter>> chargefilters;
+    private:
+        std::vector<std::shared_ptr<MatchingFilter>> softflavorfilters_;
+        std::vector<std::shared_ptr<MatchingFilter>> hardflavorfilters_;
+        std::vector<double> behaviorthresholds_;
 
-        std::vector<std::shared_ptr<MatchingFilter>> dRfilters;
-        std::vector<std::shared_ptr<MatchingFilter>> threshfilters;
+        std::vector<std::shared_ptr<MatchingFilter>> chargefilters_;
 
-        static int pdgidToIndex(int pdgid, int charge);
+        std::vector<std::shared_ptr<MatchingFilter>> dRfilters_;
+        std::vector<std::shared_ptr<MatchingFilter>> threshfilters_;
+
 };
 
 #endif

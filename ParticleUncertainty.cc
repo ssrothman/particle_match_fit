@@ -1,4 +1,5 @@
 #include "ParticleUncertainty.h"
+#include "SRothman/SimonTools/src/isID.h"
 #include "SRothman/SimonTools/src/util.h"
 #include "SRothman/SimonTools/src/etaRegion.h"
 
@@ -168,11 +169,11 @@ void RealisticParticleUncertainty::addUncertaintyToCharged(particle& part){
 
     double trkRes = trkResolution(part.pt, CHlinear_[region], CHconstant_[region]);
     double caloRes = 9e9;
-    if(part.pdgid==11){
+    if(isELE(part)){
         caloRes = caloResolution(part.eta, part.pt, 
                                         EMstochastic_[region], 
                                         EMconstant_[region]);
-    } else if(part.pdgid!=13){//muons are tracker-only objects
+    } else if(isMU(part)){//muons are tracker-only objects
         caloRes = caloResolution(part.eta, part.pt, 
                                 HADstochastic_[region], 
                                 HADconstant_[region]);
@@ -184,28 +185,22 @@ void RealisticParticleUncertainty::addUncertaintyToCharged(particle& part){
 }
 
 void StandardParticleUncertainty::addUncertainty(particle& part, const jet& j){
-    if(part.pdgid==211 || part.pdgid==11 || part.pdgid==13){ //charged particles
+    if(part.charge!=0){ //charged particles
         addUncertaintyToCharged(part);
-    } else if (part.pdgid==22){//photons
+    } else if (isEM0(part)){//photons
         addUncertaintyToNeutralEM(part);
     } else {
         addUncertaintyToNeutralHadron(part);
-        if(part.pdgid!=130){
-            std::cout << "Warning: unexpected pdgid " << part.pdgid << std::endl;
-        }
     }
 }
 
 void StandardParticleUncertaintySmearedTracks::addUncertainty(particle& part, const jet& j){
-    if(part.pdgid==13){ //charged particles
+    if(isMU(part)){ //muons can't be smeared
         addUncertaintyToCharged(part);
-    } else if (part.pdgid==22 || part.pdgid==13){//photons + electrons
+    } else if (isEM0(part) || isELE(part)){//photons + electrons
         addUncertaintyToNeutralEM(part);
     } else {
         addUncertaintyToNeutralHadron(part);
-        if(part.pdgid!=130 && part.pdgid!=211){
-            std::cout << "Warning: unexpected pdgid " << part.pdgid << std::endl;
-        }
     }
 }
 

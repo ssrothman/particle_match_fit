@@ -45,14 +45,18 @@ public:
 
                      const std::vector<std::string>& chargefilters,
 
+                     const std::vector<std::string>& dRfilters,
+
                      const std::vector<std::string>& prefitters,
                      const std::string& refiner,
                      const std::string& dropGenFilter,
                      const std::string& dropRecoFilter,
 
                      bool recoverLostTracks,
+                     bool propagateLostTracks,
                      const std::vector<double>& HADCHrecoverThresholds,
                      const std::vector<double>& ELErecoverThresholds,
+                     double Bz,
 
                      bool recoverLostHAD0,
                      const std::vector<double>& HAD0recoverThresholds,
@@ -83,11 +87,25 @@ public:
                      const std::vector<double>& ELEthresholds,
                      const std::vector<double>& MUthresholds,
 
-                     const std::vector<double>& EM0dRcuts,
-                     const std::vector<double>& HAD0dRcuts,
-                     const std::vector<double>& HADCHdRcuts,
-                     const std::vector<double>& ELEdRcuts,
-                     const std::vector<double>& MUdRcuts,
+                     const std::vector<double>& EM0constDR,
+                     const std::vector<double>& EM0floatDR,
+                     const std::vector<double>& EM0capDR,
+
+                     const std::vector<double>& HAD0constDR,
+                     const std::vector<double>& HAD0floatDR,
+                     const std::vector<double>& HAD0capDR,
+
+                     const std::vector<double>& HADCHconstDR,
+                     const std::vector<double>& HADCHfloatDR,
+                     const std::vector<double>& HADCHcapDR,
+
+                     const std::vector<double>& ELEconstDR,
+                     const std::vector<double>& ELEfloatDR,
+                     const std::vector<double>& ELEcapDR,
+
+                     const std::vector<double>& MUconstDR,
+                     const std::vector<double>& MUfloatDR,
+                     const std::vector<double>& MUcapDR,
 
                      unsigned maxReFit,
                      int verbose);
@@ -131,8 +149,10 @@ private:
     std::vector<double> HCALEtaBoundaries_;
 
     bool recoverLostTracks_;
+    bool propagateLostTracks_;
     std::vector<double> HADCHrecoverThresholds_;
     std::vector<double> ELErecoverThresholds_;
+    double Bz_;
 
     bool recoverLostHAD0_;
     std::vector<double> HAD0recoverThresholds_;

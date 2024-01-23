@@ -3,6 +3,7 @@
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "SRothman/SimonTools/src/etaRegion.h"
 #include "SRothman/SimonTools/src/util.h"
+#include "SRothman/SimonTools/src/isID.h"
 
 /*
  */
@@ -12,19 +13,19 @@
 
 #endif
 
-class DRFilter : public MatchingFilter {
+class FixedDRFilter : public MatchingFilter {
     public:
-        DRFilter(const std::vector<double> etaBoundaries,
-                 const std::vector<double> thresholds) : 
+        FixedDRFilter(const std::vector<double>& etaBoundaries,
+                      const std::vector<double>& thresholds) : 
             MatchingFilter(),
             thresholds_(thresholds),
             etaBoundaries_(etaBoundaries) {}
-        ~DRFilter() override {};
+        ~FixedDRFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
             int region = getEtaRegion(reco.eta, etaBoundaries_);
-            if(region < 0 || region > 2){
+            if(region < 0 || region >= (int)(etaBoundaries_.size())-1){
                 printf("the bad region is %d\n", region);
-                throw std::runtime_error("ThresholdFilter: region out of bounds");
+                throw std::runtime_error("FixedDRFilter: region out of bounds");
             }
             double threshold = square(thresholds_[region]);
             return dR2(reco.eta, reco.phi, gen.eta, gen.phi) < threshold;
@@ -34,23 +35,76 @@ class DRFilter : public MatchingFilter {
         const std::vector<double> etaBoundaries_;
 };
 
+class UncertaintyBasedDRFilter : public MatchingFilter {
+    public:
+        UncertaintyBasedDRFilter(const std::vector<double>& etaBoundaries,
+                                 const std::vector<double>& thresholds) : 
+            MatchingFilter(),
+            thresholds_(thresholds),
+            etaBoundaries_(etaBoundaries) {}
+        ~UncertaintyBasedDRFilter() override {};
+
+        bool pass(const particle& reco, const particle& gen) override{
+            int region = getEtaRegion(reco.eta, etaBoundaries_);
+            if(region < 0 || region >= (int)(etaBoundaries_.size()-1)){
+                printf("the bad region is %d\n", region);
+                throw std::runtime_error("FixedDRFilter: region out of bounds");
+            }
+            double threshold = square(thresholds_[region]);
+            double unc = square(reco.deta) + square(reco.dphi);
+            return dR2(reco.eta, reco.phi, gen.eta, gen.phi)/unc < threshold;
+        }
+    private:
+        const std::vector<double> thresholds_;
+        const std::vector<double> etaBoundaries_;
+};
+
+class TrackingDRFilter : public MatchingFilter {
+    public:
+        TrackingDRFilter(const std::vector<double>& etaBoundaries,
+                         const std::vector<double>& hardTerm,
+                         const std::vector<double>& invTerm,
+                         const std::vector<double>& capTerm):
+            MatchingFilter(),
+            hardTerm_(hardTerm),
+            invTerm_(invTerm),
+            capTerm_(capTerm),
+            etaBoundaries_(etaBoundaries) {}
+        ~TrackingDRFilter() override {};
+
+        bool pass(const particle& reco, const particle& gen) override {
+            int region = getEtaRegion(reco.eta, etaBoundaries_);
+            if(region < 0 || region >= (int)(etaBoundaries_.size())-1){
+                printf("the bad region is %d\n", region);
+                throw std::runtime_error("TrackingDRFilter: region out of bounds");
+            }
+            double hardTerm = hardTerm_[region];
+            double invTerm = invTerm_[region];
+            double capTerm = capTerm_[region];
+
+            double threshold2 = square(hardTerm) + square(invTerm/gen.pt);
+            threshold2 = std::min(threshold2, square(capTerm));
+
+            return dR2(reco.eta, reco.phi, gen.eta, gen.phi) < threshold2;
+        }
+    private:
+        const std::vector<double> hardTerm_;
+        const std::vector<double> invTerm_;
+        const std::vector<double> capTerm_;
+        const std::vector<double> etaBoundaries_;
+};
+
 class ThresholdFilter : public MatchingFilter {
     public:
         ThresholdFilter(const std::vector<double>& etaBoundaries,
                         const std::vector<double>& thresholds) : 
             MatchingFilter(),
             thresholds_(thresholds),
-            etaBoundaries_(etaBoundaries) {
-                //printf("\nThresholdFilter: etaBoundaries_ = ");
-                //for (auto& eta : etaBoundaries_){
-                //    printf("%f, ", eta);
-               // }
-               // printf("\n");
-            }
+            etaBoundaries_(etaBoundaries) {}
         ~ThresholdFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
             int region = getEtaRegion(gen.eta, etaBoundaries_);
-            if(region < 0 || region > 2){
+            if(region < 0 || region >= (int)(etaBoundaries_.size())-1){
                 printf("the bad region is %d\n", region);
                 throw std::runtime_error("ThresholdFilter: region out of bounds");
             }
@@ -102,7 +156,7 @@ class AnyChargedNoMuFilter : public MatchingFilter {
         AnyChargedNoMuFilter() : MatchingFilter() {};
         ~AnyChargedNoMuFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            return gen.charge != 0 && gen.pdgid != 13;
+            return gen.charge != 0 && !isMU(gen);
         }
 };
 
@@ -120,9 +174,9 @@ class AnyPhotonHardHadron1Filter : public MatchingFilter {
         AnyPhotonHardHadron1Filter() : MatchingFilter() {};
         ~AnyPhotonHardHadron1Filter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            if(gen.pdgid == 22){
+            if(isEM0(gen)){
                 return true;
-            } else if(gen.pdgid >= 100 && gen.charge==0 && gen.pt > 1){
+            } else if(isHAD0(gen) && gen.pt > 1){
                 return true;
             } else {
                 return false;
@@ -135,9 +189,9 @@ class AnyPhotonHardHadron2Filter : public MatchingFilter {
         AnyPhotonHardHadron2Filter() : MatchingFilter() {};
         ~AnyPhotonHardHadron2Filter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            if(gen.pdgid == 22){
+            if(isEM0(gen)){
                 return true;
-            } else if(gen.pdgid >= 100 && gen.charge==0 && gen.pt > 2){
+            } else if(isHAD0(gen) && gen.pt > 2){
                 return true;
             } else {
                 return false;
@@ -150,9 +204,9 @@ class AnyPhotonHardHadron5Filter : public MatchingFilter {
         AnyPhotonHardHadron5Filter() : MatchingFilter() {};
         ~AnyPhotonHardHadron5Filter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            if(gen.pdgid == 22){
+            if(isEM0(gen)){
                 return true;
-            } else if(gen.pdgid >= 100 && gen.charge==0 && gen.pt > 5){
+            } else if(isHAD0(gen) && gen.pt > 5){
                 return true;
             } else {
                 return false;
@@ -174,7 +228,7 @@ class AnyPhotonFilter : public MatchingFilter {
         AnyPhotonFilter() : MatchingFilter() {};
         ~AnyPhotonFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            return gen.pdgid == 22;
+            return isEM0(gen);
         }
 };
 
@@ -183,7 +237,7 @@ class AnyNeutralHadronFilter : public MatchingFilter {
         AnyNeutralHadronFilter() : MatchingFilter() {};
         ~AnyNeutralHadronFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            return gen.pdgid >= 100 && gen.charge == 0;
+            return isHAD0(gen);
         }
 };
 
@@ -192,7 +246,7 @@ class AnyChargedHadronFilter : public MatchingFilter {
         AnyChargedHadronFilter() : MatchingFilter() {};
         ~AnyChargedHadronFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            return gen.pdgid >= 100 && gen.charge != 0;
+            return isHADCH(gen);
         }
 };
 
@@ -201,7 +255,7 @@ class AnyHadronFilter : public MatchingFilter {
         AnyHadronFilter() : MatchingFilter() {};
         ~AnyHadronFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            return gen.pdgid >= 100;
+            return isHADCH(gen) || isHAD0(gen);
         }
 };
 
@@ -210,7 +264,7 @@ class AnyElectronFilter : public MatchingFilter {
         AnyElectronFilter() : MatchingFilter() {};
         ~AnyElectronFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            return gen.pdgid == 11;
+            return isELE(gen);
         }
 };
 
@@ -219,9 +273,46 @@ class AnyMuonFilter : public MatchingFilter {
         AnyMuonFilter() : MatchingFilter() {};
         ~AnyMuonFilter() override {};
         bool pass(const particle& reco, const particle& gen) override{
-            return gen.pdgid == 13;
+            return isMU(gen);
         }
 };
+
+std::shared_ptr<MatchingFilter> MatchingFilter::getDRFilter(
+        const std::string& behavior,
+        const std::vector<double>& etaBoundaries,
+        const std::vector<double>& thresholds){
+    if (behavior == "Fixed"){
+        return std::make_shared<FixedDRFilter>(
+                etaBoundaries, thresholds);
+    } else if(behavior == "UncertaintyBased"){
+        return std::make_shared<UncertaintyBasedDRFilter>(
+                etaBoundaries, thresholds);
+    } else if(behavior == "Tracking"){
+        throw std::runtime_error("Tracking DR filter needs more arguments; use other getter");
+    } else {
+        throw std::runtime_error("Unknown DR filter");
+    }
+}
+
+std::shared_ptr<MatchingFilter> MatchingFilter::getDRFilter(
+        const std::string& behavior,
+        const std::vector<double>& etaBoundaries,
+        const std::vector<double>& hardTerm,
+        const std::vector<double>& invTerm,
+        const std::vector<double>& capTerm){
+    if(behavior == "Tracking"){
+        return std::make_shared<TrackingDRFilter>(
+                etaBoundaries, hardTerm, invTerm, capTerm);
+    } else {
+        return getDRFilter(behavior, etaBoundaries, hardTerm);
+    }
+}
+
+std::shared_ptr<MatchingFilter> MatchingFilter::getThresholdFilter(
+        const std::vector<double>& boundaries,
+        const std::vector<double>& thresholds){
+    return std::make_shared<ThresholdFilter>(boundaries, thresholds);
+}
 
 std::shared_ptr<MatchingFilter> MatchingFilter::getFilter(const std::string& behavior){
     if (behavior == "ChargeSign"){
@@ -264,86 +355,120 @@ std::shared_ptr<MatchingFilter> MatchingFilter::getFilter(const std::string& beh
 }
 
 MatchingFilterEnsemble::MatchingFilterEnsemble(
+                //flavor filters for soft particles
                 const std::vector<std::string>& softflavorbehaviors,
+                //flavor filters for hard particles
                 const std::vector<std::string>& hardflavorbehaviors,
+                //thresholds between "soft" and "hard" above
                 const std::vector<double>& behaviorthresholds,
 
+                //charge-matching behavior
                 const std::vector<std::string>& chargebehaviors,
 
+                //pT thresholds
                 const std::vector<double>& EM0thresholds,
                 const std::vector<double>& HAD0thresholds,
                 const std::vector<double>& HADCHthresholds,
                 const std::vector<double>& ELEthresholds,
                 const std::vector<double>& MUthresholds,
 
-                const std::vector<double>& EM0dRcuts,
-                const std::vector<double>& HAD0dRcuts,
-                const std::vector<double>& HADCHdRcuts,
-                const std::vector<double>& ELEdRcuts,
-                const std::vector<double>& MUdRcuts,
+                //dR cut behavior
+                const std::vector<std::string>& DRbehaviors,
+                //dR cut parameters
+                const std::vector<double>& EM0constDR,
+                const std::vector<double>& EM0floatDR,
+                const std::vector<double>& EM0capDR,
 
+                const std::vector<double>& HAD0constDR,
+                const std::vector<double>& HAD0floatDR,
+                const std::vector<double>& HAD0capDR,
+
+                const std::vector<double>& HADCHconstDR,
+                const std::vector<double>& HADCHfloatDR,
+                const std::vector<double>& HADCHcapDR,
+
+                const std::vector<double>& ELEconstDR,
+                const std::vector<double>& ELEfloatDR,
+                const std::vector<double>& ELEcapDR,
+
+                const std::vector<double>& MUconstDR,
+                const std::vector<double>& MUfloatDR,
+                const std::vector<double>& MUcapDR,
+
+                //dR boundaries in ECAL, HCAL, tracker
                 const std::vector<double>& ECALEtaBoundaries,
                 const std::vector<double>& HCALEtaBoundaries,
                 const std::vector<double>& trkEtaBoundaries) 
     : MatchingFilter(), 
-      behaviorthresholds(behaviorthresholds){
+      behaviorthresholds_(behaviorthresholds){
 
     if(softflavorbehaviors.size() != 5 || 
        chargebehaviors.size() != 5 ||
        hardflavorbehaviors.size() != 5 ||
-       behaviorthresholds.size() != 5){
+       behaviorthresholds.size() != 5 ||
+       DRbehaviors.size() != 5){
         throw std::invalid_argument("Ensemble must have shape [EM0, HAD0, HADCH, ELE, MU]");
     }
 
     for(unsigned int i = 0; i < 5; i++){
-        softflavorfilters.push_back(MatchingFilter::getFilter(
+        softflavorfilters_.push_back(MatchingFilter::getFilter(
                     softflavorbehaviors[i]));
-        hardflavorfilters.push_back(MatchingFilter::getFilter(
+        hardflavorfilters_.push_back(MatchingFilter::getFilter(
                     hardflavorbehaviors[i]));
-        chargefilters.push_back(MatchingFilter::getFilter(chargebehaviors[i]));
+        chargefilters_.push_back(MatchingFilter::getFilter(chargebehaviors[i]));
     }
-    dRfilters.push_back(std::make_shared<DRFilter>(ECALEtaBoundaries, EM0dRcuts));
-    dRfilters.push_back(std::make_shared<DRFilter>(HCALEtaBoundaries, HAD0dRcuts));
-    dRfilters.push_back(std::make_shared<DRFilter>(trkEtaBoundaries, HADCHdRcuts));
-    dRfilters.push_back(std::make_shared<DRFilter>(trkEtaBoundaries, ELEdRcuts));
-    dRfilters.push_back(std::make_shared<DRFilter>(trkEtaBoundaries, MUdRcuts));
 
-    threshfilters.push_back(std::make_shared<ThresholdFilter>(
-                ECALEtaBoundaries, EM0thresholds));
-    threshfilters.push_back(std::make_shared<ThresholdFilter>(
-                HCALEtaBoundaries, HAD0thresholds));
-    threshfilters.push_back(std::make_shared<ThresholdFilter>(
-                trkEtaBoundaries, HADCHthresholds));
-    threshfilters.push_back(std::make_shared<ThresholdFilter>(
-                trkEtaBoundaries, ELEthresholds));
-    threshfilters.push_back(std::make_shared<ThresholdFilter>(
-                trkEtaBoundaries, MUthresholds));
+    std::vector<std::vector<double>> dRconst  = {
+        EM0constDR, HAD0constDR, 
+        HADCHconstDR, ELEconstDR, MUconstDR};
+    std::vector<std::vector<double>> dRfloat  = {
+        EM0floatDR, HAD0floatDR, 
+        HADCHfloatDR, ELEfloatDR, MUfloatDR};
+    std::vector<std::vector<double>> dRcap  = {
+        EM0capDR, HAD0capDR, 
+        HADCHcapDR, ELEcapDR, MUcapDR};
+
+    std::vector<std::vector<double>> boundaries = {
+        ECALEtaBoundaries, HCALEtaBoundaries, 
+        trkEtaBoundaries, trkEtaBoundaries, trkEtaBoundaries};
+
+    std::vector<std::vector<double>> thresholds = {
+        EM0thresholds, HAD0thresholds, 
+        HADCHthresholds, ELEthresholds, MUthresholds};
+
+    for(unsigned int i = 0; i < 5; i++){
+        dRfilters_.push_back(MatchingFilter::getDRFilter(
+            DRbehaviors[i], boundaries[i],
+            dRconst[i], dRfloat[i], dRcap[i]));
+
+        threshfilters_.push_back(MatchingFilter::getThresholdFilter(boundaries[i], thresholds[i]));
+    }
 }
 
 bool MatchingFilterEnsemble::pass(const particle& reco, const particle& gen){
-    int index = pdgidToIndex(reco.pdgid, reco.charge);
+    int index = pdgidToIndex(reco);
     std::shared_ptr<MatchingFilter> flavorfilter;
-    if(reco.pt < behaviorthresholds[index]){
-        flavorfilter = softflavorfilters[index];
+    if(reco.pt < behaviorthresholds_[index]){
+        flavorfilter = softflavorfilters_[index];
     } else{
-        flavorfilter = hardflavorfilters[index];
+        flavorfilter = hardflavorfilters_[index];
     }
     return flavorfilter->pass(reco, gen) && 
-           chargefilters[index]->pass(reco, gen) &&
-           dRfilters[index]->pass(reco, gen) && 
-           threshfilters[index]->pass(reco, gen);
+           chargefilters_[index]->pass(reco, gen) &&
+           dRfilters_[index]->pass(reco, gen) && 
+           threshfilters_[index]->pass(reco, gen);
 }
 
-int MatchingFilterEnsemble::pdgidToIndex(int pdgid, int charge) {
-    if(pdgid==22){
+int MatchingFilterEnsemble::pdgidToIndex(const particle& p) {
+    if(isEM0(p)){
         return 0;
-    } else if (pdgid >=100 && charge==0){
+    } else if (isHAD0(p)){
         return 1;
-    } else if (pdgid >=100 && charge!=0){
+    } else if (isHADCH(p)){
         return 2;
-    } else if (pdgid == 11){
+    } else if (isELE(p)){
         return 3;
-    } else if (pdgid == 13){
+    } else if (isMU(p)){
         return 4;
     } else {
         throw std::invalid_argument("Invalid particle type in MatchingFilterEnsemble");
