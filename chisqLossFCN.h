@@ -7,7 +7,7 @@
 #include "Minuit2/FCNBase.h"
 #include <vector>
 #include <memory>
-#include <armadillo>
+#include "SRothman/armadillo-12.2.0/include/armadillo"
 
 enum spatialLoss{
     TYPE1=0, //construct pT-weighted predicted pT, eta. Use in classic chisq loss

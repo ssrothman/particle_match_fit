@@ -3,8 +3,10 @@
 #include "SRothman/SimonTools/src/etaRegion.h"
 #include "SRothman/SimonTools/src/isID.h"
 
+#ifdef CMSSW
 #include "CommonTools/BaseParticlePropagator/interface/RawParticle.h"
 #include "CommonTools/BaseParticlePropagator/interface/BaseParticlePropagator.h"
+#endif
 
 matcher::matcher(const jet& recojet,
                  const jet& genjet,
@@ -295,6 +297,7 @@ void matcher::doPrefit(){
             gencopy.pdgid = 22;
         } else if(gencopy.charge != 0){
 
+#ifdef CMSSW
             RawParticle tmppart;
             tmppart.setVertex(0, 0, 0, 0);
             double px = gen.pt * cos(gen.phi);
@@ -324,6 +327,7 @@ void matcher::doPrefit(){
                 gencopy.phi = prop.particle().phi();
                 gencopy.pt = prop.particle().pt();
             }
+#endif
         }
 
         for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
