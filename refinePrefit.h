@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <memory>
-#include "SRothman/armadillo-12.2.0/include/armadillo"
 #include "SRothman/SimonTools/src/jets.h"
 #include <unordered_map>
 #include <string>

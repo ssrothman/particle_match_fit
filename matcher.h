@@ -5,8 +5,6 @@
 #include <unordered_set>
 #include <iostream>
 
-#include "SRothman/armadillo-12.2.0/include/armadillo"
-
 #include <string>
 
 #include <Minuit2/MnMigrad.h>
@@ -110,8 +108,8 @@ public:
                      unsigned maxReFit,
                      int verbose);
 
-    arma::mat ptrans() const;
-    arma::mat rawmat() const;
+    Eigen::MatrixXd ptrans() const;
+    Eigen::MatrixXd rawmat() const;
     double chisq() const;
 
     void minimize();

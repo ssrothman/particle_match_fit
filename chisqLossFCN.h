@@ -7,7 +7,6 @@
 #include "Minuit2/FCNBase.h"
 #include <vector>
 #include <memory>
-#include "SRothman/armadillo-12.2.0/include/armadillo"
 
 enum spatialLoss{
     TYPE1=0, //construct pT-weighted predicted pT, eta. Use in classic chisq loss
@@ -17,13 +16,13 @@ enum spatialLoss{
 class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
   private:
     //data defining fit problem
-    arma::vec recoPT, recoETA, recoPHI;
-    arma::vec genPT, genETA, genPHI;
-    arma::vec errPT, errETA, errPHI;
+    Eigen::VectorXd recoPT, recoETA, recoPHI;
+    Eigen::VectorXd genPT, genETA, genPHI;
+    Eigen::VectorXd errPT, errETA, errPHI;
 
     size_t NPReco, NPGen;
 
-    arma::vec weightedGenETA, weightedGenPHI;
+    Eigen::VectorXd weightedGenETA, weightedGenPHI;
 
     std::vector<std::pair<unsigned, unsigned>> locations;
 
