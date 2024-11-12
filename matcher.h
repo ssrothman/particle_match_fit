@@ -5,7 +5,7 @@
 #include <unordered_set>
 #include <iostream>
 
-#include <armadillo>
+#include "SRothman/armadillo-12.2.0/include/armadillo"
 
 #include <string>
 

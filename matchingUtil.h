@@ -2,7 +2,7 @@
 #define MATCHING_UTIL_H
 
 #include <vector>
-#include <armadillo>
+#include "SRothman/armadillo-12.2.0/include/armadillo"
 #include "SRothman/SimonTools/src/jets.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "SRothman/SimonTools/src/util.h"
