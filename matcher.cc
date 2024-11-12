@@ -365,8 +365,8 @@ void matcher::doPrefit(){
     }
 
     if(verbose_ > 1){
-        arma::mat fixed(recojet_.nPart, genjet_.nPart, arma::fill::zeros);
-        arma::mat floating(recojet_.nPart, genjet_.nPart, arma::fill::zeros);
+        Eigen::MatrixXd fixed(recojet_.nPart, genjet_.nPart);
+        Eigen::MatrixXd floating(recojet_.nPart, genjet_.nPart);
         for(unsigned i=0; i<fitlocations_.size(); ++i){
             const auto& match = fitlocations_[i];
             if(floating_[i]){
