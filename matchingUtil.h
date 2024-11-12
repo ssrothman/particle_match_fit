@@ -2,7 +2,6 @@
 #define MATCHING_UTIL_H
 
 #include <vector>
-#include "SRothman/armadillo-12.2.0/include/armadillo"
 #include "SRothman/SimonTools/src/jets.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "SRothman/SimonTools/src/util.h"
@@ -32,7 +31,7 @@ inline double chisquared(const particle& reco, const particle& gen,
                       wpt);
 }
 
-arma::mat fullmat(const unsigned nrow, const unsigned ncol,
+Eigen::MatrixXd fullmat(const unsigned nrow, const unsigned ncol,
                   const std::vector<std::pair<unsigned, unsigned>>& locs,
                   const std::vector<double>& vals);
 

@@ -159,25 +159,25 @@ matcher::matcher(const jet& recojet,
     initializeOptimizer();
 }
 
-arma::mat matcher::rawmat() const{
+Eigen::MatrixXd matcher::rawmat() const{
     if(optimizer_){
         return fullmat(recojet_.nPart, genjet_.nPart, 
                        fitlocations_, optimizer_->Params());
     } else {
-        arma::mat result = fullmat(recojet_.nPart, genjet_.nPart, {}, {});
+        Eigen::MatrixXd result = fullmat(recojet_.nPart, genjet_.nPart, {}, {});
         return result;
     }
 }
 
-arma::mat matcher::ptrans() const {
-    arma::mat ans = rawmat();
+Eigen::MatrixXd matcher::ptrans() const {
+    Eigen::MatrixXd ans = rawmat();
 
-    arma::vec genpt = genjet_.ptvec();
-    arma::vec recpt = recojet_.ptvec();
+    Eigen::VectorXd genpt = genjet_.ptvec();
+    Eigen::VectorXd recpt = recojet_.ptvec();
     genpt/=genjet_.sumpt;
     recpt/=recojet_.sumpt;
 
-    arma::vec predpt = ans * genpt;
+    Eigen::VectorXd predpt = ans * genpt;
 
     for(unsigned iGen = 0; iGen < genjet_.nPart; ++iGen){
         for(unsigned iReco = 0; iReco < recojet_.nPart; ++iReco){
@@ -191,13 +191,13 @@ arma::mat matcher::ptrans() const {
         printf("ptrans:\n");
         std::cout << ans;
         printf("GEN\n");
-        std::cout << genpt.t();
+        std::cout << genpt.transpose();
         printf("ptrans * GEN\n");
-        std::cout << (ans * genpt).t();
+        std::cout << (ans * genpt).transpose();
         printf("rawmat * GEN\n");
-        std::cout << (rawmat() * genpt).t();
+        std::cout << (rawmat() * genpt).transpose();
         printf("RECO\n");
-        std::cout << recpt.t();
+        std::cout << recpt.transpose();
     }
     return ans;
 }
@@ -451,8 +451,8 @@ void matcher::minimize(){
 
     if (verbose_>1){
         printf("conservation of energy?\n");
-        printf("sum(gen) = %f\n", arma::accu(genjet_.ptvec()));
-        printf("sum(A*gen) = %f\n", arma::accu(rawmat()*genjet_.ptvec()));
+        printf("sum(gen) = %f\n", genjet_.ptvec().sum());
+        printf("sum(A*gen) = %f\n", (rawmat()*genjet_.ptvec()).sum());
     }
 }
 
@@ -461,7 +461,7 @@ bool matcher::clipValues(){
         return false;
     }
 
-    arma::mat A = rawmat();
+    Eigen::MatrixXd A = rawmat();
 
     bool didanything = false;
     for(unsigned i=0; i<fitlocations_.size(); ++i){
@@ -528,9 +528,8 @@ void matcher::testDrop(int iGen, int iReco, bool allowInducedPU){
         return;
     }
 
-    arma::mat Araw_initial = rawmat();
-    arma::vec PU_initial = arma::conv_to<arma::vec>::from(
-            (Araw_initial * genjet_.ptvec()) == 0);
+    Eigen::MatrixXd Araw_initial = rawmat();
+    Eigen::VectorXd PU_initial = ((Araw_initial * genjet_.ptvec()).array() == 0.).cast<double>();;
 
     MnUserParameters savedstate = optimizer_->Parameters();
     double savedchisq = chisq();
@@ -559,10 +558,9 @@ void matcher::testDrop(int iGen, int iReco, bool allowInducedPU){
     
     double newchisq = chisq();
 
-    arma::mat Araw_final = rawmat();
-    arma::vec PU_final = arma::conv_to<arma::vec>::from(
-            (Araw_final * genjet_.ptvec()) == 0);
-    bool PUchanged = arma::any(PU_initial != PU_final);
+    Eigen::MatrixXd Araw_final = rawmat();
+    Eigen::VectorXd PU_final = ((Araw_final * genjet_.ptvec()).array() == 0.0).cast<double>();
+    bool PUchanged = (PU_initial.array() != PU_final.array()).any();
 
     if(newchisq < savedchisq && (!PUchanged || allowInducedPU)){
         if(verbose_){

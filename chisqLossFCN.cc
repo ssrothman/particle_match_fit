@@ -19,8 +19,8 @@ ChisqLossFCN::ChisqLossFCN(const jet& recojet,
       errETA(recojet.detavec()), 
       errPHI(recojet.dphivec()),
       NPReco(recoPT.size()), NPGen(genPT.size()),
-      weightedGenETA(genPT % genETA), 
-      weightedGenPHI(genPT % genPHI),
+      weightedGenETA(genPT.array() * genETA.array()), 
+      weightedGenPHI(genPT.array() * genPHI.array()),
       locations(locations),
       type(type),
       PUpt0s(PUpt0s),
@@ -47,7 +47,7 @@ ChisqLossFCN::ChisqLossFCN(const jet& recojet,
 double ChisqLossFCN::operator()(const std::vector<double>& data) const {
     //printf("top of loss\n");
     //fflush(stdout);
-    arma::mat A = fullmat(recoPT.n_elem, genPT.n_elem, locations, data);
+    Eigen::MatrixXd A = fullmat(recoPT.size(), genPT.size(), locations, data);
     //printf("1\n");
     //fflush(stdout);
 
@@ -56,51 +56,56 @@ double ChisqLossFCN::operator()(const std::vector<double>& data) const {
     double lossPHI = 0;
     double lossPU = 0;
 
-    arma::vec recoPT_pred = A * (genPT);
+    Eigen::VectorXd recoPT_pred = A * genPT;
     //printf("2\n");
     //fflush(stdout);
 
-    arma::vec PU = arma::conv_to<arma::vec>::from(recoPT_pred == 0);
+    Eigen::VectorXd PU = (recoPT_pred.array() == 0).cast<double>();
     //printf("3\n");
     //fflush(stdout);
 
-    arma::vec lossPTvec = (recoPT_pred - recoPT)/ errPT;
-    lossPTvec %= (1-PU);
-    lossPT = arma::dot(lossPTvec, lossPTvec);
+    Eigen::VectorXd lossPTvec = (recoPT_pred - recoPT).array()/ errPT.array();
+    lossPTvec.array() *= (1-PU.array());
+    lossPT = lossPTvec.dot(lossPTvec);
     //printf("4\n");
     //fflush(stdout);
 
-    recoPT_pred.replace(0, 1);
+    for (unsigned i=0; i<recoPT.size(); ++i){
+        if(recoPT_pred[i] == 0){
+            recoPT_pred[i] = 1;
+        }
+    }
     //printf("5\n");
     //fflush(stdout);
     if (type == spatialLoss::TYPE1){
-        arma::vec recoETA_pred = A * weightedGenETA;
-        recoETA_pred /= recoPT_pred;
-        arma::vec lossETAvec = (recoETA_pred - recoETA)/ errETA;
-        lossETAvec %= (1-PU);
-        lossETA = arma::dot(lossETAvec, lossETAvec);
+        Eigen::VectorXd recoETA_pred = A * weightedGenETA;
+        recoETA_pred.array() /= recoPT_pred.array();
+        Eigen::VectorXd lossETAvec = (recoETA_pred - recoETA).array()/ errETA.array();
+        lossETAvec.array() *= (1-PU.array());
+        lossETA = lossETAvec.dot(lossETAvec);
         //printf("6\n");
         //fflush(stdout);
 
-        arma::vec recoPHI_pred = A * weightedGenPHI;
-        recoPHI_pred /= recoPT_pred;
-        arma::vec lossPHIvec = (recoPHI_pred - recoPHI)/ errPHI;
-        lossPHIvec %= (1-PU);
-        lossPHI = arma::dot(lossPHIvec, lossPHIvec);
+        Eigen::VectorXd recoPHI_pred = A * weightedGenPHI;
+        recoPHI_pred.array() /= recoPT_pred.array();
+        Eigen::VectorXd lossPHIvec = (recoPHI_pred - recoPHI).array()/ errPHI.array();
+        lossPHIvec.array() *= (1-PU.array());
+        lossPHI = lossPHIvec.dot(lossPHIvec);
         //printf("7\n");
         //fflush(stdout);
     } else if (type == spatialLoss::TYPE2){
-        arma::mat diffETA(NPReco, NPGen, arma::fill::none);
-        diffETA.each_col() = recoETA;
-        diffETA.each_row() -= arma::trans(genETA);
-        lossETA = arma::accu(diffETA % diffETA);
+        /*Eigen::MatrixXd diffETA(NPReco, NPGen);
+        diffETA.array().colwise() = recoETA.array();
+        diffETA.array().rowwise() -= genETA.transpose().array();
+        lossETA = diffETA.dot(diffETA);
         //printf("8\n");
         //fflush(stdout);
 
-        arma::mat diffPHI(NPReco, NPGen, arma::fill::none);
-        diffPHI.each_col() = recoPHI;
-        diffPHI.each_row() -= arma::trans(genPHI);
-        lossPHI = arma::accu(diffPHI % diffPHI);
+        Eigen::MatrixXd diffPHI(NPReco, NPGen);
+        diffPHI.array().colwise() = recoPHI.array();
+        diffPHI.array().rowwise() -= genPHI.transpose().array();
+        lossPHI = diffPHI.dot(diffPHI);*/
+        throw std::runtime_error("TYPE2 not implemented");
         //printf("9\n");
         //fflush(stdout);
     }
@@ -108,7 +113,7 @@ double ChisqLossFCN::operator()(const std::vector<double>& data) const {
     for(unsigned i=0; i<NPReco; ++i){
         //printf("PU loss for particle %u\n", i);
         //fflush(stdout);
-        if(PU(i) == 0) continue;
+        if(PU[i] == 0) continue;
         //printf("passed PU check\n");
         //fflush(stdout);
         //printf("ids[i] = %u\n", ids[i]);
@@ -119,7 +124,7 @@ double ChisqLossFCN::operator()(const std::vector<double>& data) const {
         //printf("got parameters\n");
         //fflush(stdout);
 
-        lossPU += 2*exp*std::max(std::log(recoPT(i)/pt0), 0.0) + penalty;
+        lossPU += 2*exp*std::max(std::log(recoPT[i]/pt0), 0.0) + penalty;
     }
     //printf("10\n");
     //fflush(stdout);
