@@ -1,7 +1,7 @@
 #ifndef MATCHING_PARTICLEUNCERTAINTY_H
 #define MATCHING_PARTICLEUNCERTAINTY_H
 
-#include "SRothman/SimonTools/src/jets.h"
+#include "SRothman/SimonTools/src/jet.h"
 #include <vector>
 #include <memory>
 #include <string>
@@ -10,7 +10,7 @@ class ParticleUncertainty{
     public:
         ParticleUncertainty(){};
         virtual ~ParticleUncertainty(){};
-        virtual void addUncertainty(particle& part, const jet& j) = 0;
+        virtual void addUncertainty(simon::particle& part, const simon::jet& j) = 0;
 
     static std::shared_ptr<ParticleUncertainty> get(
             const std::string& behavior);

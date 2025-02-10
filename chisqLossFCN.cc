@@ -2,8 +2,8 @@
 #include "SRothman/SimonTools/src/isID.h"
 #include "matchingUtil.h"
 
-ChisqLossFCN::ChisqLossFCN(const jet& recojet,
-                          const jet& genjet,
+ChisqLossFCN::ChisqLossFCN(const simon::jet& recojet,
+                          const simon::jet& genjet,
                           const std::vector<std::pair<unsigned, unsigned>>& locations,
                           const enum spatialLoss type,
                           const std::vector<double>& PUpt0s,

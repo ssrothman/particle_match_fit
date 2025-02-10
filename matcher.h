@@ -10,7 +10,7 @@
 #include <Minuit2/MnMigrad.h>
 #include <Minuit2/FunctionMinimum.h>
 
-#include "SRothman/SimonTools/src/jets.h"
+#include "SRothman/SimonTools/src/jet.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "SRothman/SimonTools/src/util.h"
 
@@ -25,8 +25,8 @@ using namespace ROOT::Minuit2;
 
 class matcher{
 public:
-    explicit matcher(const jet& recojet,
-                     const jet& genjet,
+    explicit matcher(const simon::jet& recojet,
+                     const simon::jet& genjet,
 
                      double clipval, 
 
@@ -128,7 +128,7 @@ private:
     void greedyDropParticles(bool gen);
     void testDrop(int iGen, int iReco, bool allowInducedPU);
 
-    jet recojet_, genjet_;
+    simon::jet recojet_, genjet_;
 
     std::vector<std::pair<unsigned, unsigned>> fitlocations_;
     std::vector<bool> floating_;

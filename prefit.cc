@@ -11,11 +11,11 @@ class Prefitter{
             filter_(filter) {}
         virtual ~Prefitter() {};
 
-        std::vector<unsigned> operator()(const particle& part, const jet& j){
+        std::vector<unsigned> operator()(const simon::particle& part, const simon::jet& j){
             return prefit(part, j);
         }
 
-        virtual std::vector<unsigned> prefit(const particle& part, const jet& j)=0;
+        virtual std::vector<unsigned> prefit(const simon::particle& part, const simon::jet& j)=0;
 
         static std::shared_ptr<Prefitter> get(const std::string& behavior, 
                             std::shared_ptr<MatchingFilter> filter);
@@ -32,7 +32,7 @@ class NOMATCHprefitter: public Prefitter{
             Prefitter(filter) {};
         ~NOMATCHprefitter() {};
 
-        std::vector<unsigned> prefit(const particle& part, const jet& j) override {
+        std::vector<unsigned> prefit([[maybe_unused]] const simon::particle& part, [[maybe_unused]] const simon::jet& j) override {
             return {};
         }
 };
@@ -43,14 +43,14 @@ class CLOSESTprefitter : public Prefitter{
             Prefitter(filter) {};
         ~CLOSESTprefitter() {};
 
-        std::vector<unsigned> prefit(const particle& part, const jet& genjet) override {
+        std::vector<unsigned> prefit(const simon::particle& part, const simon::jet& genjet) override {
             double minDR =std::numeric_limits<double>::infinity();
             int bestIdx = -1;
 
             for(unsigned i=0; i<genjet.nPart; ++i){
-                const particle& genpart = genjet.particles[i];
+                const simon::particle& genpart = genjet.particles[i];
                 if(filter_->pass(part, genpart)){
-                    double dR = dR2(part.eta, part.phi, 
+                    double dR = simon::deltaR2(part.eta, part.phi, 
                                     genpart.eta, genpart.phi);
                     if(dR<minDR || bestIdx==-1){
                         minDR = dR;
@@ -72,12 +72,12 @@ class HARDESTprefitter : public Prefitter{
             Prefitter(filter) {};
         ~HARDESTprefitter() {};
 
-        std::vector<unsigned> prefit(const particle& part, const jet& genjet) override {
+        std::vector<unsigned> prefit(const simon::particle& part, const simon::jet& genjet) override {
             double maxPt = -std::numeric_limits<double>::infinity();
             int bestIdx = -1;
 
             for(unsigned i=0; i<genjet.nPart; ++i){
-                const particle& genpart = genjet.particles[i];
+                const simon::particle& genpart = genjet.particles[i];
                 if(filter_->pass(part, genpart)){
                     if(genpart.pt>maxPt || bestIdx==-1){
                         maxPt = genpart.pt;
@@ -99,12 +99,12 @@ class BESTprefitter : public Prefitter{
             Prefitter(filter) {};
         ~BESTprefitter() {};
 
-        std::vector<unsigned> prefit(const particle& part, const jet& j) override {
+        std::vector<unsigned> prefit(const simon::particle& part, const simon::jet& j) override {
             double minChisq = std::numeric_limits<double>::infinity();
             int bestIdx = -1;
 
             for(unsigned i=0; i<j.nPart; ++i){
-                const particle& genpart = j.particles[i];
+                const simon::particle& genpart = j.particles[i];
             
 
                 if(filter_->pass(part, genpart)){
@@ -138,10 +138,10 @@ class FLOATprefitter : public Prefitter{
             Prefitter(filter) {};
         ~FLOATprefitter() {};
 
-        std::vector<unsigned> prefit(const particle& part, const jet& j) override {
+        std::vector<unsigned> prefit(const simon::particle& part, const simon::jet& j) override {
             std::vector<unsigned> result;
             for(unsigned i=0; i<j.nPart; ++i){
-                const particle& genpart = j.particles[i];
+                const simon::particle& genpart = j.particles[i];
                 if(filter_->pass(part, genpart)){
 #ifdef DEBUG
                     printf("\tgen %u: pass\n", i);
@@ -186,7 +186,7 @@ PrefitterEnsemble::PrefitterEnsemble(const std::vector<std::string>& behaviors,
     }
 }
 
-std::vector<unsigned> PrefitterEnsemble::prefit(const particle& part, const jet& j){
+std::vector<unsigned> PrefitterEnsemble::prefit(const simon::particle& part, const simon::jet& j){
     if(isEM0(part)){
         return prefitters_[0]->prefit(part, j);
     } else if(isHAD0(part)){

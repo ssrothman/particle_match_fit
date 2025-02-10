@@ -18,7 +18,7 @@ class ALLparticleFilter : public particleFilter{
 public:
     ALLparticleFilter() {};
     ~ALLparticleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass([[maybe_unused]] const simon::particle& part) override{
         return true;
     }
 };
@@ -27,7 +27,7 @@ class NONEparticleFilter : public particleFilter{
 public:
     NONEparticleFilter() {};
     ~NONEparticleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass([[maybe_unused]] const simon::particle& part) override{
         return false;
     }
 };
@@ -36,7 +36,7 @@ class CHARGEDparticleFilter : public particleFilter{
 public:
     CHARGEDparticleFilter() {};
     ~CHARGEDparticleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass(const simon::particle& part) override{
         return part.charge != 0;
     }
 };
@@ -45,7 +45,7 @@ class NEUTRALparticleFilter : public particleFilter{
 public:
     NEUTRALparticleFilter() {};
     ~NEUTRALparticleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass(const simon::particle& part) override{
         return part.charge == 0;
     }
 };
@@ -54,7 +54,7 @@ class EM0particleFilter : public particleFilter{
 public:
     EM0particleFilter() {};
     ~EM0particleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass(const simon::particle& part) override{
         return isEM0(part);
     }
 };
@@ -63,7 +63,7 @@ class HAD0particleFilter : public particleFilter{
 public:
     HAD0particleFilter() {};
     ~HAD0particleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass(const simon::particle& part) override{
         return isHAD0(part);
     }
 };
@@ -72,7 +72,7 @@ class EM0HAD0particleFilter : public particleFilter{
 public:
     EM0HAD0particleFilter() {};
     ~EM0HAD0particleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass(const simon::particle& part) override{
         return isEM0(part) || isHAD0(part);
     }
 };
@@ -81,7 +81,7 @@ class EM0CHARGEDparticleFilter : public particleFilter{
 public:
     EM0CHARGEDparticleFilter() {};
     ~EM0CHARGEDparticleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass(const simon::particle& part) override{
         return isEM0(part) || part.charge != 0;
     }
 };
@@ -90,7 +90,7 @@ class HAD0CHARGEDparticleFilter : public particleFilter{
 public:
     HAD0CHARGEDparticleFilter() {};
     ~HAD0CHARGEDparticleFilter() {};
-    bool pass(const particle& part) override{
+    bool pass(const simon::particle& part) override{
         return isHAD0(part) || part.charge != 0;
     }
 };

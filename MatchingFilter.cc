@@ -21,14 +21,14 @@ class FixedDRFilter : public MatchingFilter {
             thresholds_(thresholds),
             etaBoundaries_(etaBoundaries) {}
         ~FixedDRFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
-            int region = getEtaRegion(reco.eta, etaBoundaries_);
+        bool pass(const simon::particle& reco, const simon::particle& gen) override{
+            int region = simon::getEtaRegion(reco.eta, etaBoundaries_);
             if(region < 0 || region >= (int)(etaBoundaries_.size())-1){
                 printf("the bad region is %d\n", region);
                 throw std::runtime_error("FixedDRFilter: region out of bounds");
             }
-            double threshold = square(thresholds_[region]);
-            return dR2(reco.eta, reco.phi, gen.eta, gen.phi) < threshold;
+            double threshold = simon::square(thresholds_[region]);
+            return simon::deltaR2(reco.eta, reco.phi, gen.eta, gen.phi) < threshold;
         }
     private:
         const std::vector<double> thresholds_;
@@ -44,15 +44,15 @@ class UncertaintyBasedDRFilter : public MatchingFilter {
             etaBoundaries_(etaBoundaries) {}
         ~UncertaintyBasedDRFilter() override {};
 
-        bool pass(const particle& reco, const particle& gen) override{
-            int region = getEtaRegion(reco.eta, etaBoundaries_);
+        bool pass(const simon::particle& reco, const simon::particle& gen) override{
+            int region = simon::getEtaRegion(reco.eta, etaBoundaries_);
             if(region < 0 || region >= (int)(etaBoundaries_.size()-1)){
                 printf("the bad region is %d\n", region);
                 throw std::runtime_error("FixedDRFilter: region out of bounds");
             }
-            double threshold = square(thresholds_[region]);
-            double unc = square(reco.deta) + square(reco.dphi);
-            return dR2(reco.eta, reco.phi, gen.eta, gen.phi)/unc < threshold;
+            double threshold = simon::square(thresholds_[region]);
+            double unc = simon::square(reco.deta) + simon::square(reco.dphi);
+            return simon::deltaR2(reco.eta, reco.phi, gen.eta, gen.phi)/unc < threshold;
         }
     private:
         const std::vector<double> thresholds_;
@@ -72,8 +72,8 @@ class TrackingDRFilter : public MatchingFilter {
             etaBoundaries_(etaBoundaries) {}
         ~TrackingDRFilter() override {};
 
-        bool pass(const particle& reco, const particle& gen) override {
-            int region = getEtaRegion(reco.eta, etaBoundaries_);
+        bool pass(const simon::particle& reco, const simon::particle& gen) override {
+            int region = simon::getEtaRegion(reco.eta, etaBoundaries_);
             if(region < 0 || region >= (int)(etaBoundaries_.size())-1){
                 printf("the bad region is %d\n", region);
                 throw std::runtime_error("TrackingDRFilter: region out of bounds");
@@ -82,10 +82,10 @@ class TrackingDRFilter : public MatchingFilter {
             double invTerm = invTerm_[region];
             double capTerm = capTerm_[region];
 
-            double threshold2 = square(hardTerm) + square(invTerm/gen.pt);
-            threshold2 = std::min(threshold2, square(capTerm));
+            double threshold2 = simon::square(hardTerm) + simon::square(invTerm/gen.pt);
+            threshold2 = std::min(threshold2, simon::square(capTerm));
 
-            return dR2(reco.eta, reco.phi, gen.eta, gen.phi) < threshold2;
+            return simon::deltaR2(reco.eta, reco.phi, gen.eta, gen.phi) < threshold2;
         }
     private:
         const std::vector<double> hardTerm_;
@@ -102,8 +102,8 @@ class ThresholdFilter : public MatchingFilter {
             thresholds_(thresholds),
             etaBoundaries_(etaBoundaries) {}
         ~ThresholdFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
-            int region = getEtaRegion(gen.eta, etaBoundaries_);
+        bool pass(const simon::particle& reco, const simon::particle& gen) override{
+            int region = simon::getEtaRegion(gen.eta, etaBoundaries_);
             if(region < 0 || region >= (int)(etaBoundaries_.size())-1){
                 printf("the bad region is %d\n", region);
                 throw std::runtime_error("ThresholdFilter: region out of bounds");
@@ -119,7 +119,7 @@ class ChargeSignFilter : public MatchingFilter {
     public:
         ChargeSignFilter() : MatchingFilter() {};
         ~ChargeSignFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass(const simon::particle& reco, const simon::particle& gen) override{
             return gen.charge == reco.charge;
         }
 };
@@ -128,7 +128,7 @@ class OppositeChargeSignFilter : public MatchingFilter {
     public:
         OppositeChargeSignFilter() : MatchingFilter() {};
         ~OppositeChargeSignFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass(const simon::particle& reco, const simon::particle& gen) override{
             return gen.charge == -reco.charge;
         }
 };
@@ -137,7 +137,7 @@ class ChargeMagnitudeFilter : public MatchingFilter {
     public:
         ChargeMagnitudeFilter() : MatchingFilter() {};
         ~ChargeMagnitudeFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass(const simon::particle& reco, const simon::particle& gen) override{
             return std::abs(gen.charge) == std::abs(reco.charge);
         }
 };
@@ -146,7 +146,7 @@ class AnyChargedFilter : public MatchingFilter {
     public:
         AnyChargedFilter() : MatchingFilter() {};
         ~AnyChargedFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return gen.charge != 0;
         }
 };
@@ -155,7 +155,7 @@ class AnyChargedNoMuFilter : public MatchingFilter {
     public:
         AnyChargedNoMuFilter() : MatchingFilter() {};
         ~AnyChargedNoMuFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return gen.charge != 0 && !isMU(gen);
         }
 };
@@ -164,7 +164,7 @@ class AnyNeutralFilter : public MatchingFilter {
     public:
         AnyNeutralFilter() : MatchingFilter() {};
         ~AnyNeutralFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return gen.charge == 0;
         }
 };
@@ -173,7 +173,7 @@ class AnyPhotonHardHadron1Filter : public MatchingFilter {
     public:
         AnyPhotonHardHadron1Filter() : MatchingFilter() {};
         ~AnyPhotonHardHadron1Filter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             if(isEM0(gen)){
                 return true;
             } else if(isHAD0(gen) && gen.pt > 1){
@@ -188,7 +188,7 @@ class AnyPhotonHardHadron2Filter : public MatchingFilter {
     public:
         AnyPhotonHardHadron2Filter() : MatchingFilter() {};
         ~AnyPhotonHardHadron2Filter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             if(isEM0(gen)){
                 return true;
             } else if(isHAD0(gen) && gen.pt > 2){
@@ -203,7 +203,7 @@ class AnyPhotonHardHadron5Filter : public MatchingFilter {
     public:
         AnyPhotonHardHadron5Filter() : MatchingFilter() {};
         ~AnyPhotonHardHadron5Filter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             if(isEM0(gen)){
                 return true;
             } else if(isHAD0(gen) && gen.pt > 5){
@@ -218,7 +218,7 @@ class AnyFilter : public MatchingFilter {
     public:
         AnyFilter() : MatchingFilter() {};
         ~AnyFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, [[maybe_unused]] const simon::particle& gen) override{
             return true;
         }
 };
@@ -227,7 +227,7 @@ class AnyPhotonFilter : public MatchingFilter {
     public:
         AnyPhotonFilter() : MatchingFilter() {};
         ~AnyPhotonFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return isEM0(gen);
         }
 };
@@ -236,7 +236,7 @@ class AnyNeutralHadronFilter : public MatchingFilter {
     public:
         AnyNeutralHadronFilter() : MatchingFilter() {};
         ~AnyNeutralHadronFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return isHAD0(gen);
         }
 };
@@ -245,7 +245,7 @@ class AnyChargedHadronFilter : public MatchingFilter {
     public:
         AnyChargedHadronFilter() : MatchingFilter() {};
         ~AnyChargedHadronFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return isHADCH(gen);
         }
 };
@@ -254,7 +254,7 @@ class AnyHadronFilter : public MatchingFilter {
     public:
         AnyHadronFilter() : MatchingFilter() {};
         ~AnyHadronFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return isHADCH(gen) || isHAD0(gen);
         }
 };
@@ -263,7 +263,7 @@ class AnyElectronFilter : public MatchingFilter {
     public:
         AnyElectronFilter() : MatchingFilter() {};
         ~AnyElectronFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return isELE(gen);
         }
 };
@@ -272,7 +272,7 @@ class AnyMuonFilter : public MatchingFilter {
     public:
         AnyMuonFilter() : MatchingFilter() {};
         ~AnyMuonFilter() override {};
-        bool pass(const particle& reco, const particle& gen) override{
+        bool pass([[maybe_unused]] const simon::particle& reco, const simon::particle& gen) override{
             return isMU(gen);
         }
 };
@@ -445,7 +445,7 @@ MatchingFilterEnsemble::MatchingFilterEnsemble(
     }
 }
 
-bool MatchingFilterEnsemble::pass(const particle& reco, const particle& gen){
+bool MatchingFilterEnsemble::pass(const simon::particle& reco, const simon::particle& gen){
     int index = pdgidToIndex(reco);
     std::shared_ptr<MatchingFilter> flavorfilter;
     if(reco.pt < behaviorthresholds_[index]){
@@ -459,7 +459,7 @@ bool MatchingFilterEnsemble::pass(const particle& reco, const particle& gen){
            threshfilters_[index]->pass(reco, gen);
 }
 
-int MatchingFilterEnsemble::pdgidToIndex(const particle& p) {
+int MatchingFilterEnsemble::pdgidToIndex(const simon::particle& p) {
     if(isEM0(p)){
         return 0;
     } else if (isHAD0(p)){

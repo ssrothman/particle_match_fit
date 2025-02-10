@@ -1,7 +1,7 @@
 #ifndef MATCHING_MATCHINGFILTER_H
 #define MATCHING_MATCHINGFILTER_H
 
-#include "SRothman/SimonTools/src/jets.h"
+#include "SRothman/SimonTools/src/jet.h"
 #include <memory>
 #include <string> 
 
@@ -9,7 +9,7 @@ class MatchingFilter{
     public:
         MatchingFilter() {};
         virtual ~MatchingFilter(){};
-        virtual bool pass(const particle& reco, const particle& gen) = 0;
+        virtual bool pass(const simon::particle& reco, const simon::particle& gen) = 0;
 
         static std::shared_ptr<MatchingFilter> getFilter(
                 const std::string& behavior);
@@ -70,13 +70,13 @@ class MatchingFilterEnsemble : public MatchingFilter{
                 const std::vector<double>& HCALEtaBoundaries,
                 const std::vector<double>& trkEtaBoundaries);
 
-        bool pass(const particle& reco, const particle& gen);
+        bool pass(const simon::particle& reco, const simon::particle& gen);
 
-        bool operator()(const particle& reco, const particle& gen){
+        bool operator()(const simon::particle& reco, const simon::particle& gen){
             return pass(reco, gen);
         }
 
-        static int pdgidToIndex(const particle& p);
+        static int pdgidToIndex(const simon::particle& p);
 
     private:
         std::vector<std::shared_ptr<MatchingFilter>> softflavorfilters_;

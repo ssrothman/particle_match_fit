@@ -2,7 +2,7 @@
 #define MATCHING_UTIL_H
 
 #include <vector>
-#include "SRothman/SimonTools/src/jets.h"
+#include "SRothman/SimonTools/src/jet.h"
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "SRothman/SimonTools/src/util.h"
 #include <string>
@@ -14,7 +14,7 @@ T chisquared(const T& recopt, const T& recoeta, const T& recophi,
              bool wpt){
     double errpt = (recopt - genpt) / dpt;
     double erreta = (recoeta - geneta) / deta;
-    double errphi = deltaphi(recophi, genphi) / dphi;
+    double errphi = simon::deltaPhi(recophi, genphi) / dphi;
 
     if (wpt){
         return errpt*errpt + erreta*erreta + errphi*errphi;
@@ -23,7 +23,7 @@ T chisquared(const T& recopt, const T& recoeta, const T& recophi,
     }
 }
 
-inline double chisquared(const particle& reco, const particle& gen,
+inline double chisquared(const simon::particle& reco, const simon::particle& gen,
                          bool wpt){
     return chisquared(reco.pt, reco.eta, reco.phi, 
                       gen.pt, gen.eta, gen.phi,

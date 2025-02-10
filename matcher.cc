@@ -8,8 +8,8 @@
 #include "CommonTools/BaseParticlePropagator/interface/BaseParticlePropagator.h"
 #endif
 
-matcher::matcher(const jet& recojet,
-                 const jet& genjet,
+matcher::matcher(const simon::jet& recojet,
+                 const simon::jet& genjet,
 
                  double clipval, 
    
@@ -206,7 +206,7 @@ void matcher::fillUncertainties(){
     if(verbose_>1){
         printf("\nUNCERTAINTIES:\n");
     }
-    for(particle& p : recojet_.particles){
+    for(simon::particle& p : recojet_.particles){
         uncertainty_->addUncertainty(p, recojet_); 
         if(verbose_>1){
             printf("(%0.5f, %0.5f, %0.5f)\n", p.dpt, p.deta, p.dphi);
@@ -224,7 +224,7 @@ void matcher::doPrefit(){
 
 
     for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){//foreach reco particle
-        particle& reco = recojet_.particles[iReco];
+        simon::particle& reco = recojet_.particles[iReco];
 
         if(verbose_ > 9){
             printf("reco %u\n", iReco);
@@ -243,7 +243,7 @@ void matcher::doPrefit(){
         if(usedGen[iGen]){
             continue;
         }
-        const particle& gen = genjet_.particles[iGen];
+        const simon::particle& gen = genjet_.particles[iGen];
 
         if(isEM0(gen) || isMU(gen)){//can't recover photons or muons
             continue;
@@ -251,7 +251,7 @@ void matcher::doPrefit(){
 
         bool recover=false;
         if(recoverLostTracks_){
-            int etaRegion = getEtaRegion(gen.eta, trkEtaBoundaries_);
+            int etaRegion = simon::getEtaRegion(gen.eta, trkEtaBoundaries_);
             if(etaRegion >= (int)trkEtaBoundaries_.size()-1){ //this can happen because genjets cluster in rapidity
                                                               //in this case the particle will be out of acceptance anyway
                                                               //so we can just skip it for recovery
@@ -273,7 +273,7 @@ void matcher::doPrefit(){
 
         if(recoverLostHAD0_){
             if(isHAD0(gen)){
-                int etaRegion = getEtaRegion(gen.eta, HCALEtaBoundaries_);
+                int etaRegion = simon::getEtaRegion(gen.eta, HCALEtaBoundaries_);
                 if(etaRegion < 0 || etaRegion >= (int)HCALEtaBoundaries_.size()-1){
                     printf("BIG PROBLEM: HCAL ETA REGION OUT OF BOUNDS\n");
                     printf("etaRegion: %d\n", etaRegion);
@@ -292,7 +292,7 @@ void matcher::doPrefit(){
         if(verbose_ > 9){
             printf("recovering gen %u\n", iGen);
         }
-        particle gencopy(gen);
+        simon::particle gencopy(gen);
         if(isHAD0(gen)){
             gencopy.pdgid = 22;
         } else if(gencopy.charge != 0){
@@ -331,7 +331,7 @@ void matcher::doPrefit(){
         }
 
         for(unsigned iReco=0; iReco<recojet_.particles.size(); ++iReco){
-            particle& reco = recojet_.particles[iReco];
+            simon::particle& reco = recojet_.particles[iReco];
             if(filters_->pass(reco, gencopy)){
                 if(verbose_>9){
                     printf("\treco %u: pass\n", iReco);

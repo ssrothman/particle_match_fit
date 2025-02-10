@@ -9,8 +9,8 @@ class NONEprefitRefiner: public prefitRefiner{
         ~NONEprefitRefiner() {}
 
         matchMap refine(const matchMap& recoToGen,
-                        const jet& recojet,
-                        const jet& genjet) const override {
+                        [[maybe_unused]] const simon::jet& recojet,
+                        [[maybe_unused]] const simon::jet& genjet) const override {
             return invertMap(recoToGen);
         }
 };
@@ -21,8 +21,8 @@ class OneGenOneRecoprefitRefiner: public prefitRefiner{
         ~OneGenOneRecoprefitRefiner() {}
 
         matchMap refine(const matchMap& recoToGen,
-                        const jet& recojet,
-                        const jet& genjet) const override {
+                        const simon::jet& recojet,
+                        const simon::jet& genjet) const override {
             matchMap genToReco = invertMap(recoToGen);
 
             matchMap result;
@@ -57,8 +57,8 @@ class OneGenOneRecoPerTypeprefitRefiner: public prefitRefiner{
         ~OneGenOneRecoPerTypeprefitRefiner() {}
 
         matchMap refine(const matchMap& recoToGen,
-                        const jet& recojet,
-                        const jet& genjet) const override {
+                        const simon::jet& recojet,
+                        const simon::jet& genjet) const override {
             matchMap genToReco = invertMap(recoToGen);
 
             matchMap result;

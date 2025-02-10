@@ -7,7 +7,7 @@ class NaiveParticleUncertainty : public ParticleUncertainty {
     public:
         NaiveParticleUncertainty() : ParticleUncertainty() {}
         ~NaiveParticleUncertainty() override {}
-        void addUncertainty(particle& part, const jet& j) override;
+        void addUncertainty(simon::particle& part, const simon::jet& j) override;
 };
 
 
@@ -56,9 +56,9 @@ class RealisticParticleUncertainty : public ParticleUncertainty{
             CHangular_(CHangular),
             trkEtaBoundaries_(trkEtaBoundaries) {}
     protected:
-        void addUncertaintyToNeutralEM(particle& part);
-        void addUncertaintyToNeutralHadron(particle& part);
-        void addUncertaintyToCharged(particle& part);
+        void addUncertaintyToNeutralEM(simon::particle& part);
+        void addUncertaintyToNeutralHadron(simon::particle& part);
+        void addUncertaintyToCharged(simon::particle& part);
 
         std::vector<double> EMstochastic_, EMconstant_;
         std::vector<double> ECALgranularity_;
@@ -98,7 +98,7 @@ class StandardParticleUncertainty : public RealisticParticleUncertainty {
                     CHMS, CHangular,
                     trkEtaBoundaries) {}
         ~StandardParticleUncertainty() override {}
-        void addUncertainty(particle& part, const jet& j) override;
+        void addUncertainty(simon::particle& part, const simon::jet& j) override;
 };
 
 class StandardParticleUncertaintySmearedTracks : public RealisticParticleUncertainty {
@@ -126,46 +126,46 @@ class StandardParticleUncertaintySmearedTracks : public RealisticParticleUncerta
                     CHMS, CHangular,
                     trkEtaBoundaries) {}
         ~StandardParticleUncertaintySmearedTracks() override {}
-        void addUncertainty(particle& part, const jet& j) override;
+        void addUncertainty(simon::particle& part, const simon::jet& j) override;
 };
 
 static double caloResolution(const double& eta, const double& pt, const double& A, const double& C){
     double E = pt * std::cosh(eta);
-    return std::sqrt(square(A/std::sqrt(E)) + square(C)) * pt;
+    return std::sqrt(simon::square(A/std::sqrt(E)) + simon::square(C)) * pt;
 }
 
 static double trkResolution(const double& pt, const double& A, const double& B){
-    return std::sqrt(square(A*pt) + square(B)) * pt;
+    return std::sqrt(simon::square(A*pt) + simon::square(B)) * pt;
 }
 
 static double trkAngularResolution(const double& pt, const double& A, const double& B){
-    return std::sqrt(square(A/pt) + square(B));
+    return std::sqrt(simon::square(A/pt) + simon::square(B));
 }
 
-void NaiveParticleUncertainty::addUncertainty(particle& part, const jet& j){
+void NaiveParticleUncertainty::addUncertainty(simon::particle& part, [[maybe_unused]] const simon::jet& j){
     part.dpt = 0.1 * part.pt;
     part.dphi = 0.05;
     part.deta = 0.05;
 }
 
-void RealisticParticleUncertainty::addUncertaintyToNeutralEM(particle& part){
-    int region = getEtaRegion(part.eta, ECALEtaBoundaries_);
+void RealisticParticleUncertainty::addUncertaintyToNeutralEM(simon::particle& part){
+    int region = simon::getEtaRegion(part.eta, ECALEtaBoundaries_);
 
     part.dpt = caloResolution(part.eta, part.pt, EMstochastic_[region], EMconstant_[region]);
     part.dphi = ECALgranularity_[region];
     part.deta = part.dphi;
 }
 
-void RealisticParticleUncertainty::addUncertaintyToNeutralHadron(particle& part){
-    int region = getEtaRegion(part.eta, HCALEtaBoundaries_);
+void RealisticParticleUncertainty::addUncertaintyToNeutralHadron(simon::particle& part){
+    int region = simon::getEtaRegion(part.eta, HCALEtaBoundaries_);
 
     part.dpt = caloResolution(part.eta, part.pt, HADstochastic_[region], HADconstant_[region]);
     part.dphi = HCALgranularity_[region];
     part.deta = part.dphi;
 }
 
-void RealisticParticleUncertainty::addUncertaintyToCharged(particle& part){
-    int region = getEtaRegion(part.eta, trkEtaBoundaries_);
+void RealisticParticleUncertainty::addUncertaintyToCharged(simon::particle& part){
+    int region = simon::getEtaRegion(part.eta, trkEtaBoundaries_);
 
     double trkRes = trkResolution(part.pt, CHlinear_[region], CHconstant_[region]);
     double caloRes = 9e9;
@@ -184,7 +184,7 @@ void RealisticParticleUncertainty::addUncertaintyToCharged(particle& part){
     part.deta = part.dphi;
 }
 
-void StandardParticleUncertainty::addUncertainty(particle& part, const jet& j){
+void StandardParticleUncertainty::addUncertainty(simon::particle& part, [[maybe_unused]] const simon::jet& j){
     if(part.charge!=0){ //charged particles
         addUncertaintyToCharged(part);
     } else if (isEM0(part)){//photons
@@ -194,7 +194,7 @@ void StandardParticleUncertainty::addUncertainty(particle& part, const jet& j){
     }
 }
 
-void StandardParticleUncertaintySmearedTracks::addUncertainty(particle& part, const jet& j){
+void StandardParticleUncertaintySmearedTracks::addUncertainty(simon::particle& part, [[maybe_unused]] const simon::jet& j){
     if(isMU(part)){ //muons can't be smeared
         addUncertaintyToCharged(part);
     } else if (isEM0(part) || isELE(part)){//photons + electrons
@@ -220,19 +220,19 @@ std::shared_ptr<ParticleUncertainty> ParticleUncertainty::get(
         const std::vector<double>& EMstochastic,
         const std::vector<double>& EMconstant,
         const std::vector<double>& ECALgranularityEta,
-        const std::vector<double>& ECALgranularityPhi,
+        [[maybe_unused]] const std::vector<double>& ECALgranularityPhi,
         const std::vector<double>& ECALEtaBoundaries,
         const std::vector<double>& HADstochastic,
         const std::vector<double>& HADconstant,
         const std::vector<double>& HCALgranularityEta,
-        const std::vector<double>& HCALgranularityPhi,
+        [[maybe_unused]] const std::vector<double>& HCALgranularityPhi,
         const std::vector<double>& HCALEtaBoundaries,
         const std::vector<double>& CHlinear,
         const std::vector<double>& CHconstant,
         const std::vector<double>& CHMSeta,
-        const std::vector<double>& CHMSphi,
+        [[maybe_unused]] const std::vector<double>& CHMSphi,
         const std::vector<double>& CHangularEta,
-        const std::vector<double>& CHangularPhi,
+        [[maybe_unused]] const std::vector<double>& CHangularPhi,
         const std::vector<double>& trkEtaBoundaries){
 
     if(behavior == "Naive"){

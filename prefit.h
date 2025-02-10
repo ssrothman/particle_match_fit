@@ -4,7 +4,7 @@
 #include <vector>
 #include "SRothman/SimonTools/src/deltaR.h"
 #include "MatchingFilter.h"
-#include "SRothman/SimonTools/src/jets.h"
+#include "SRothman/SimonTools/src/jet.h"
 #include <memory>
 #include <string>
 
@@ -14,9 +14,9 @@ class PrefitterEnsemble{
     public:
         PrefitterEnsemble(const std::vector<std::string>& behaviors, std::shared_ptr<MatchingFilterEnsemble> filters);
         
-        std::vector<unsigned> prefit(const particle& part, const jet& j);
+        std::vector<unsigned> prefit(const simon::particle& part, const simon::jet& j);
 
-        std::vector<unsigned> operator()(const particle& part, const jet& j){
+        std::vector<unsigned> operator()(const simon::particle& part, const simon::jet& j){
             return prefit(part, j);
         }
 

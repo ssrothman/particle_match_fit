@@ -1,7 +1,7 @@
 #ifndef PMF_CHISQ_LOSS_FCN_H
 #define PMF_CHISQ_LOSS_FCN_H
 
-#include "SRothman/SimonTools/src/jets.h"
+#include "SRothman/SimonTools/src/jet.h"
 #include "SRothman/SimonTools/src/util.h"
 
 #include "Minuit2/FCNBase.h"
@@ -44,8 +44,8 @@ class ChisqLossFCN: public ROOT::Minuit2::FCNBase {
         PUpt0s(), PUexps(), PUpenalties(),
         ids() {}
 
-    explicit ChisqLossFCN(const jet& recojet,
-                          const jet& genjet,
+    explicit ChisqLossFCN(const simon::jet& recojet,
+                          const simon::jet& genjet,
                           const std::vector<std::pair<unsigned, unsigned>>& locations,
                           const enum spatialLoss type,
                           const std::vector<double>& PUpt0s,
