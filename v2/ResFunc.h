@@ -18,6 +18,8 @@ namespace matching {
                                 const double eta,
                                 const double phi,
                                 const int charge) const = 0;
+
+        virtual ~ResFunc() = default;
     };
 };
 

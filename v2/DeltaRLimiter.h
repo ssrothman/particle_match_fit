@@ -21,6 +21,8 @@ namespace matching {
                 const double param1,
                 const double param2,
                 const double param3);
+
+        virtual ~DeltaRLimiter() = default;
     };
 
 };
