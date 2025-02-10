@@ -8,6 +8,7 @@ matching::TrackMatcher::TrackMatcher(
         const std::string& jet_dr_mode,
         const double jet_dr_param1,
         const double jet_dr_param2,
+        const double jet_dr_param3,
         const std::string& jet_ptres_mode,
         const double jet_ptres_param1,
         const double jet_ptres_param2,
@@ -17,6 +18,7 @@ matching::TrackMatcher::TrackMatcher(
         const std::string& particle_dr_mode,
         const double particle_dr_param1,
         const double particle_dr_param2,
+        const double particle_dr_param3,
         const std::string& particle_ptres_mode,
         const double particle_ptres_param1,
         const double particle_ptres_param2,
@@ -28,7 +30,8 @@ matching::TrackMatcher::TrackMatcher(
     jet_dR_limiter(DeltaRLimiter::get_deltaRlimiter(
             jet_dr_mode,
             jet_dr_param1,
-            jet_dr_param2)),
+            jet_dr_param2,
+            jet_dr_param3)),
     jet_chisq_fn(
             jet_ptres_mode,
             jet_ptres_param1,
@@ -40,7 +43,8 @@ matching::TrackMatcher::TrackMatcher(
     particle_dR_limiter(DeltaRLimiter::get_deltaRlimiter(
             particle_dr_mode,
             particle_dr_param1,
-            particle_dr_param2)),
+            particle_dr_param2,
+            particle_dr_param3)),
     particle_chisq_fn(particle_ptres_mode,
             particle_ptres_param1,
             particle_ptres_param2,
@@ -78,6 +82,7 @@ static void match_one_to_one(
 
     for(size_t iReco : reco_ptorder){
         const auto& reco = recovec[iReco];
+        printf("reco pt: %f\n", reco.pt);
         
         double best_chisq = INF;
         int best_igen = -1;

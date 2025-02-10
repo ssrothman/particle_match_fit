@@ -39,7 +39,7 @@ double matching::ChiSqFn::evaluate(const double pt1,
     double charge_term = 0;
     if (charge_product < 0){
         charge_term = opp_charge_penalty;
-    } else if (charge_product == 0){
+    } else if (charge_product == 0 && charge1 != charge2){
         charge_term = no_charge_penalty;
     }
 

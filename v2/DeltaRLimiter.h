@@ -19,7 +19,8 @@ namespace matching {
         static DeltaRLimiterPtr get_deltaRlimiter(
                 const std::string& mode,
                 const double param1,
-                const double param2);
+                const double param2,
+                const double param3);
     };
 
 };

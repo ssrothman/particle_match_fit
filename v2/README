@@ -1,0 +1,84 @@
+Highly-configurable jet constituent matcher
+
+The external entry point is the TrackMatcher class. 
+The constructor for this class takes the parameters to construct:
+     - a DeltaRLimiter object for the jet matching
+     - a ChiSqFn for the jet matching metric
+     - a DeltaRLimiter object for the particle matching
+     - a ChiSqFn for the particle matching metric
+The parameters and options for these are described below.
+
+Methods are provided to perform one-to-one matching of jets and particles,
+with the following algorithm:
+
+1. sort the gen and reco collections in decending pT order
+    we thus prioritize matching the highest pT objects first
+2. for each reco object, we find the 'best' matching gen object 
+    this is the gen object with the best chi-squared metric
+    subject to the constraint that dR(gen, reco) < dRlimit(reco)
+3. This best match is then assigned as /the/ match
+
+Note that this is greedy w.r.t. gen objects, but not w.r.t. reco objects.
+
+
+
+The DeltaRLimiter class is a wrapper around a function with signature:
+(pt, eta, phi) -> limit
+with up to three constant parameters. 
+
+This can be constructed by the DeltaRLimiter::get_deltaRlimiter() factory
+with the following parameters:
+    std::string mode: which subclass to instantiate
+    double param1: the first constant parameter
+    double param2: the second constant parameter
+    double param3: the third constant parameter
+In principle any of the parameters can be ignored depending on which subclass
+is selected.
+
+Available subclasses (modes) are:
+"Const": a constant dR limit
+    param1 = deltaR threshold
+    param2 = ignored
+    param3 = ignored
+"TrackPt":  dR limit that models the tracker angular resolution 
+            limit = min(A + B/pt, C)
+    param1 = A
+    param2 = B
+    param3 = C
+
+
+
+
+The ChiSqFn class provides a chi-squared metric for matching, with form
+chi2 = (delta_pT/sigma_pT)^2 + (delta_R/sigma_R)^2 + charge_mismatch_penalty
+
+sigma_pT and sigma_R are functions of the reco object (pT,eta,phi), 
+with different functional forms available as subclasses of ResFunc. 
+
+charge_mismatch_penalty is the following:
+   0 if reco.charge * gen.charge > 0 (ie same sign)
+   opp_charge_penalty if reco.charge * gen.charge < 0 (ie opposite sign)
+   no_charge_penalty if reco.charge * gen.charge = 0 (ie one is neutral) AND reco.charge!=gen.charge
+
+The constructor for ChiSqFn takes the following parameters:
+    std::string ptres_mode: which ResFunc to use for the pT resolution
+    double ptres_param1: the first parameter for the pT resolution
+    double ptres_param2: the second parameter for the pT resolution
+    std::string angres_mode: which ResFunc to use for the angular resolution
+    double angres_param1: the first parameter for the angular resolution
+    double angres_param2: the second parameter for the angular resolution
+    double opp_charge_penalty: described above
+    double no_charge_penalty: described above
+
+Available ResFunc subclasses (modes) are:
+"Const" : constant resolution
+    param1 = resolution
+    param2 = ignored
+"TrackPt" : resolution that models the tracker pT resolution
+        resolution = A + B*pt
+    param1 = A
+    param2 = B
+"TrackAng" : resolution that models the tracker angular resolution
+        resolution = A + B/pt
+    param1 = A
+    param2 = B
