@@ -60,7 +60,7 @@ static void match_one_to_one(
         const std::vector<T>& recovec,
         const matching::DeltaRLimiterPtr& dRlimiter,
         const matching::ChiSqFn& chisq_fn,
-        std::vector<std::pair<size_t, size_t>>& matches){
+        matching::matchvec& matches){
 
     matches.clear();
 
@@ -82,7 +82,6 @@ static void match_one_to_one(
 
     for(size_t iReco : reco_ptorder){
         const auto& reco = recovec[iReco];
-        printf("reco pt: %f\n", reco.pt);
         
         double best_chisq = INF;
         int best_igen = -1;
@@ -109,27 +108,21 @@ static void match_one_to_one(
                 best_igen = iGen;
             }
         }//end gen loop
-        matches.emplace_back(iReco, best_igen);
+        if(best_igen>=0){
+            matches.emplace_back(iReco, best_igen);
+        }
     }//end reco loop
 }//end match_one_to_one()
 
 void matching::TrackMatcher::matchJets(
         const std::vector<simon::jet>& genjets,
         const std::vector<simon::jet>& recojets,
-        std::vector<std::pair<simon::jet const *, simon::jet const *>>& matches){
+        matchvec& matches){
     matches.clear();
-
-    std::vector<std::pair<size_t, size_t>> match_indices;
 
     match_one_to_one(genjets, recojets,
                      jet_dR_limiter, jet_chisq_fn, 
-                     match_indices);
-
-    for(const auto& match : match_indices){
-        matches.emplace_back(
-            const_cast<simon::jet*>(&genjets[match.second]),
-            const_cast<simon::jet*>(&recojets[match.first]));
-    }
+                     matches);
 }
 
 void matching::TrackMatcher::matchParticles(
@@ -138,16 +131,69 @@ void matching::TrackMatcher::matchParticles(
         Eigen::MatrixXd& tmat){
 
     tmat.resize(recojet.nPart, genjet.nPart);
+    tmat.setZero();
 
     const auto& genparts = genjet.particles;
     const auto& recoparts = recojet.particles;
 
-    std::vector<std::pair<size_t, size_t>> matches;
+    matchvec matches;
     match_one_to_one(genparts, recoparts,
                      particle_dR_limiter, particle_chisq_fn,
                      matches);
 
     for(const auto& match : matches){
-        tmat(match.first, match.second) = 1;
+        tmat(match.iReco, match.iGen) = 1;
     }
 }
+
+#ifdef CMSSW_GIT_HASH
+matching::TrackMatcher::TrackMatcher(const edm::ParameterSet& iConfig) :
+    TrackMatcher(
+            iConfig.getParameter<std::string>("jet_dr_mode"),
+            iConfig.getParameter<double>("jet_dr_param1"),
+            iConfig.getParameter<double>("jet_dr_param2"),
+            iConfig.getParameter<double>("jet_dr_param3"),
+            iConfig.getParameter<std::string>("jet_ptres_mode"),
+            iConfig.getParameter<double>("jet_ptres_param1"),
+            iConfig.getParameter<double>("jet_ptres_param2"),
+            iConfig.getParameter<std::string>("jet_angres_mode"),
+            iConfig.getParameter<double>("jet_angres_param1"),
+            iConfig.getParameter<double>("jet_angres_param2"),
+            iConfig.getParameter<std::string>("particle_dr_mode"),
+            iConfig.getParameter<double>("particle_dr_param1"),
+            iConfig.getParameter<double>("particle_dr_param2"),
+            iConfig.getParameter<double>("particle_dr_param3"),
+            iConfig.getParameter<std::string>("particle_ptres_mode"),
+            iConfig.getParameter<double>("particle_ptres_param1"),
+            iConfig.getParameter<double>("particle_ptres_param2"),
+            iConfig.getParameter<std::string>("particle_angres_mode"),
+            iConfig.getParameter<double>("particle_angres_param1"),
+            iConfig.getParameter<double>("particle_angres_param2"),
+            iConfig.getParameter<double>("opp_charge_penalty"),
+            iConfig.getParameter<double>("no_charge_penalty")) {}
+
+void matching::TrackMatcher::fillPSetDescription(edm::ParameterSetDescription& desc){
+    desc.add<std::string>("jet_dr_mode");
+    desc.add<double>("jet_dr_param1");
+    desc.add<double>("jet_dr_param2");
+    desc.add<double>("jet_dr_param3");
+    desc.add<std::string>("jet_ptres_mode");
+    desc.add<double>("jet_ptres_param1");
+    desc.add<double>("jet_ptres_param2");
+    desc.add<std::string>("jet_angres_mode");
+    desc.add<double>("jet_angres_param1");
+    desc.add<double>("jet_angres_param2");
+    desc.add<std::string>("particle_dr_mode");
+    desc.add<double>("particle_dr_param1");
+    desc.add<double>("particle_dr_param2");
+    desc.add<double>("particle_dr_param3");
+    desc.add<std::string>("particle_ptres_mode");
+    desc.add<double>("particle_ptres_param1");
+    desc.add<double>("particle_ptres_param2");
+    desc.add<std::string>("particle_angres_mode");
+    desc.add<double>("particle_angres_param1");
+    desc.add<double>("particle_angres_param2");
+    desc.add<double>("opp_charge_penalty");
+    desc.add<double>("no_charge_penalty");
+}
+#endif

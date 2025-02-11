@@ -8,7 +8,18 @@
 #include <string>
 #include <vector>
 
+#ifdef CMSSW_GIT_HASH
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#endif
+
 namespace matching {
+    struct matchidxs {
+        size_t iReco, iGen;
+        matchidxs(size_t iReco, size_t iGen) : iReco(iReco), iGen(iGen) {}
+    };
+    using matchvec = std::vector<matchidxs>;
+
     class TrackMatcher {
     public:
         TrackMatcher(const std::string& jet_dr_mode,
@@ -37,12 +48,18 @@ namespace matching {
         void matchJets(
             const std::vector<simon::jet>& genjets,
             const std::vector<simon::jet>& recojets,
-            std::vector<std::pair<simon::jet const*, simon::jet const *>>& matches);
+            matchvec& matches);
 
         void matchParticles(
             const simon::jet& genjet,
             const simon::jet& recojet,
             Eigen::MatrixXd& tmat);
+
+#ifdef CMSSW_GIT_HASH
+        TrackMatcher(const edm::ParameterSet& iConfig);
+
+        static void fillPSetDescription(edm::ParameterSetDescription& desc);
+#endif
 
     private:
         const DeltaRLimiterPtr jet_dR_limiter;
