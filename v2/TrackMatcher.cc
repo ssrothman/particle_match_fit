@@ -56,8 +56,8 @@ matching::TrackMatcher::TrackMatcher(
 
 template <typename T>
 static void match_one_to_one(
-        const std::vector<T>& genvec,
         const std::vector<T>& recovec,
+        const std::vector<T>& genvec,
         const matching::DeltaRLimiterPtr& dRlimiter,
         const matching::ChiSqFn& chisq_fn,
         matching::matchvec& matches){
@@ -115,8 +115,8 @@ static void match_one_to_one(
 }//end match_one_to_one()
 
 void matching::TrackMatcher::matchJets(
-        const std::vector<simon::jet>& genjets,
         const std::vector<simon::jet>& recojets,
+        const std::vector<simon::jet>& genjets,
         matchvec& matches){
     matches.clear();
 
@@ -126,8 +126,8 @@ void matching::TrackMatcher::matchJets(
 }
 
 void matching::TrackMatcher::matchParticles(
-        const simon::jet& genjet,
         const simon::jet& recojet,
+        const simon::jet& genjet,
         Eigen::MatrixXd& tmat){
 
     tmat.resize(recojet.nPart, genjet.nPart);

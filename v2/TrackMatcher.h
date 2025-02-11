@@ -46,13 +46,13 @@ namespace matching {
                      const double no_charge_penalty);
 
         void matchJets(
-            const std::vector<simon::jet>& genjets,
             const std::vector<simon::jet>& recojets,
+            const std::vector<simon::jet>& genjets,
             matchvec& matches);
 
         void matchParticles(
-            const simon::jet& genjet,
             const simon::jet& recojet,
+            const simon::jet& genjet,
             Eigen::MatrixXd& tmat);
 
 #ifdef CMSSW_GIT_HASH
