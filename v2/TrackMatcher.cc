@@ -120,7 +120,7 @@ void matching::TrackMatcher::matchJets(
         matchvec& matches){
     matches.clear();
 
-    match_one_to_one(genjets, recojets,
+    match_one_to_one(recojets, genjets,
                      jet_dR_limiter, jet_chisq_fn, 
                      matches);
 }
@@ -137,7 +137,7 @@ void matching::TrackMatcher::matchParticles(
     const auto& recoparts = recojet.particles;
 
     matchvec matches;
-    match_one_to_one(genparts, recoparts,
+    match_one_to_one(recoparts, genparts,
                      particle_dR_limiter, particle_chisq_fn,
                      matches);
 
