@@ -5,61 +5,122 @@
 static constexpr double INF = std::numeric_limits<double>::infinity();
 
 matching::TrackMatcher::TrackMatcher(
-        const std::string& jet_dr_mode,
-        const double jet_dr_param1,
-        const double jet_dr_param2,
-        const double jet_dr_param3,
-        const std::string& jet_ptres_mode,
-        const double jet_ptres_param1,
-        const double jet_ptres_param2,
-        const std::string& jet_angres_mode,
-        const double jet_angres_param1,
-        const double jet_angres_param2,
-        const std::string& particle_dr_mode,
-        const double particle_dr_param1,
-        const double particle_dr_param2,
-        const double particle_dr_param3,
-        const std::string& particle_ptres_mode,
-        const double particle_ptres_param1,
-        const double particle_ptres_param2,
-        const std::string& particle_angres_mode,
-        const double particle_angres_param1,
-        const double particle_angres_param2,
-        const double opp_charge_penalty,
-        const double no_charge_penalty):
-    jet_dR_limiter(DeltaRLimiter::get_deltaRlimiter(
-            jet_dr_mode,
-            jet_dr_param1,
-            jet_dr_param2,
-            jet_dr_param3)),
-    jet_chisq_fn(
-            jet_ptres_mode,
-            jet_ptres_param1,
-            jet_ptres_param2,
-            jet_angres_mode,
-            jet_angres_param1,
-            jet_angres_param2,
-            0.0, 0.0),
-    particle_dR_limiter(DeltaRLimiter::get_deltaRlimiter(
-            particle_dr_mode,
-            particle_dr_param1,
-            particle_dr_param2,
-            particle_dr_param3)),
-    particle_chisq_fn(particle_ptres_mode,
-            particle_ptres_param1,
-            particle_ptres_param2,
-            particle_angres_mode,
-            particle_angres_param1,
-            particle_angres_param2,
-            opp_charge_penalty,
-            no_charge_penalty) {}
+        //jet parameters
+        const double jet_dR_threshold,
+
+        //global params
+        const double max_chisq,
+
+        //electron params
+        const std::string& ele_dr_mode,
+        const double ele_dr_param1,
+        const double ele_dr_param2,
+        const double ele_dr_param3,
+        const std::string& ele_ptres_mode,
+        const double ele_ptres_param1,
+        const double ele_ptres_param2,
+        const std::string& ele_angres_mode,
+        const double ele_angres_param1,
+        const double ele_angres_param2,
+        const double ele_opp_charge_penalty,
+        const double ele_no_charge_penalty,
+        const std::string& ele_charge_filter_mode,
+        const std::string& ele_flavor_filter_mode,
+
+        //muon params
+        const std::string& mu_dr_mode,
+        const double mu_dr_param1,
+        const double mu_dr_param2,
+        const double mu_dr_param3,
+        const std::string& mu_ptres_mode,
+        const double mu_ptres_param1,
+        const double mu_ptres_param2,
+        const std::string& mu_angres_mode,
+        const double mu_angres_param1,
+        const double mu_angres_param2,
+        const double mu_opp_charge_penalty,
+        const double mu_no_charge_penalty,
+        const std::string& mu_charge_filter_mode,
+        const std::string& mu_flavor_filter_mode,
+
+        //charged hadron params
+        const std::string& hadch_dr_mode,
+        const double hadch_dr_param1,
+        const double hadch_dr_param2,
+        const double hadch_dr_param3,
+        const std::string& hadch_ptres_mode,
+        const double hadch_ptres_param1,
+        const double hadch_ptres_param2,
+        const std::string& hadch_angres_mode,
+        const double hadch_angres_param1,
+        const double hadch_angres_param2,
+        const double hadch_opp_charge_penalty,
+        const double hadch_no_charge_penalty,
+        const std::string& hadch_charge_filter_mode,
+        const std::string& hadch_flavor_filter_mode):
+
+    jet_dR_threshold(jet_dR_threshold),
+    max_chisq(max_chisq),
+    particle_params() {
+    
+    particle_params.setup_params(
+        PerFlavorMatchParams::ELE,
+        ele_dr_mode,
+        ele_dr_param1,
+        ele_dr_param2,
+        ele_dr_param3,
+        ele_ptres_mode,
+        ele_ptres_param1,
+        ele_ptres_param2,
+        ele_angres_mode,
+        ele_angres_param1,
+        ele_angres_param2,
+        ele_opp_charge_penalty,
+        ele_no_charge_penalty,
+        ele_charge_filter_mode,
+        ele_flavor_filter_mode);
+
+    particle_params.setup_params(
+        PerFlavorMatchParams::MU,
+        mu_dr_mode,
+        mu_dr_param1,
+        mu_dr_param2,
+        mu_dr_param3,
+        mu_ptres_mode,
+        mu_ptres_param1,
+        mu_ptres_param2,
+        mu_angres_mode,
+        mu_angres_param1,
+        mu_angres_param2,
+        mu_opp_charge_penalty,
+        mu_no_charge_penalty,
+        mu_charge_filter_mode,
+        mu_flavor_filter_mode);
+
+    particle_params.setup_params(
+        PerFlavorMatchParams::HADCH,
+        hadch_dr_mode,
+        hadch_dr_param1,
+        hadch_dr_param2,
+        hadch_dr_param3,
+        hadch_ptres_mode,
+        hadch_ptres_param1,
+        hadch_ptres_param2,
+        hadch_angres_mode,
+        hadch_angres_param1,
+        hadch_angres_param2,
+        hadch_opp_charge_penalty,
+        hadch_no_charge_penalty,
+        hadch_charge_filter_mode,
+        hadch_flavor_filter_mode);
+}
 
 template <typename T>
 static void match_one_to_one(
         const std::vector<T>& recovec,
         const std::vector<T>& genvec,
-        const matching::DeltaRLimiterPtr& dRlimiter,
-        const matching::ChiSqFn& chisq_fn,
+        const matching::PerFlavorMatchParams& particle_params,
+        const double max_chisq,
         matching::matchvec& matches){
 
     matches.clear();
@@ -82,6 +143,7 @@ static void match_one_to_one(
 
     for(size_t iReco : reco_ptorder){
         const auto& reco = recovec[iReco];
+        const auto& theparms = particle_params.get_params(reco);
         
         double best_chisq = INF;
         int best_igen = -1;
@@ -93,11 +155,19 @@ static void match_one_to_one(
 
             double dR = simon::deltaR(gen.eta, gen.phi,
                                      reco.eta, reco.phi);
-            double dRlim = dRlimiter->evaluate(
+
+            double dRlim = theparms.dR_limiter->evaluate(
                     reco.pt, reco.eta, reco.phi);
             if(dR > dRlim) continue;
 
-            double chisq = chisq_fn.evaluate(
+            if(!theparms.charge_filter->evaluate(
+                    reco.charge, gen.charge)) continue;
+
+            if(!theparms.flavor_filter->evaluate(
+                    gen.charge,
+                    gen.pdgid)) continue;
+
+            double chisq = theparms.chi_sq_fn.evaluate(
                     reco.pt, reco.eta, 
                     reco.phi, reco.charge,
                     gen.pt, gen.eta, 
@@ -108,7 +178,7 @@ static void match_one_to_one(
                 best_igen = iGen;
             }
         }//end gen loop
-        if(best_igen>=0){
+        if(best_igen>=0 && best_chisq < max_chisq){
             matches.emplace_back(iReco, best_igen);
         }
     }//end reco loop
@@ -120,9 +190,43 @@ void matching::TrackMatcher::matchJets(
         matchvec& matches){
     matches.clear();
 
-    match_one_to_one(recojets, genjets,
-                     jet_dR_limiter, jet_chisq_fn, 
-                     matches);
+    std::vector<size_t> gen_ptorder(genjets.size());
+    std::iota(gen_ptorder.begin(), gen_ptorder.end(), 0);
+    std::sort(gen_ptorder.begin(), gen_ptorder.end(),
+            [&](size_t i1, size_t i2){
+                return genjets[i1].pt > genjets[i2].pt;
+            });
+
+    std::vector<size_t> reco_ptorder(recojets.size());
+    std::iota(reco_ptorder.begin(), reco_ptorder.end(), 0);
+    std::sort(reco_ptorder.begin(), reco_ptorder.end(),
+            [&](size_t i1, size_t i2){
+                return recojets[i1].pt > recojets[i2].pt;
+            });
+
+    std::vector<bool> gen_used(genjets.size(), false);
+    for(const size_t iRecoJet : reco_ptorder){
+        double best_dR = INF;
+        int matched_gen = -1;
+        const auto& recojet = recojets[iRecoJet];
+        for(const size_t iGenJet : gen_ptorder){
+            if(gen_used[iGenJet]) continue;
+
+            const auto& genjet = genjets[iGenJet];
+
+            double dR = simon::deltaR(genjet.eta, genjet.phi,
+                                     recojet.eta, recojet.phi);
+
+            if(dR < best_dR){
+                best_dR = dR;
+                matched_gen = iGenJet;
+            }
+        }//end gen loop
+        if(best_dR < jet_dR_threshold){
+            matches.emplace_back(iRecoJet, matched_gen);
+            gen_used[matched_gen] = true;
+        }
+    }
 }
 
 void matching::TrackMatcher::matchParticles(
@@ -137,9 +241,11 @@ void matching::TrackMatcher::matchParticles(
     const auto& recoparts = recojet.particles;
 
     matchvec matches;
-    match_one_to_one(recoparts, genparts,
-                     particle_dR_limiter, particle_chisq_fn,
-                     matches);
+    match_one_to_one(
+            recoparts, genparts,
+            particle_params,
+            max_chisq,
+            matches);
 
     for(const auto& match : matches){
         tmat(match.iReco, match.iGen) = 1;
@@ -148,52 +254,38 @@ void matching::TrackMatcher::matchParticles(
 
 #ifdef CMSSW_GIT_HASH
 matching::TrackMatcher::TrackMatcher(const edm::ParameterSet& iConfig) :
-    TrackMatcher(
-            iConfig.getParameter<std::string>("jet_dr_mode"),
-            iConfig.getParameter<double>("jet_dr_param1"),
-            iConfig.getParameter<double>("jet_dr_param2"),
-            iConfig.getParameter<double>("jet_dr_param3"),
-            iConfig.getParameter<std::string>("jet_ptres_mode"),
-            iConfig.getParameter<double>("jet_ptres_param1"),
-            iConfig.getParameter<double>("jet_ptres_param2"),
-            iConfig.getParameter<std::string>("jet_angres_mode"),
-            iConfig.getParameter<double>("jet_angres_param1"),
-            iConfig.getParameter<double>("jet_angres_param2"),
-            iConfig.getParameter<std::string>("particle_dr_mode"),
-            iConfig.getParameter<double>("particle_dr_param1"),
-            iConfig.getParameter<double>("particle_dr_param2"),
-            iConfig.getParameter<double>("particle_dr_param3"),
-            iConfig.getParameter<std::string>("particle_ptres_mode"),
-            iConfig.getParameter<double>("particle_ptres_param1"),
-            iConfig.getParameter<double>("particle_ptres_param2"),
-            iConfig.getParameter<std::string>("particle_angres_mode"),
-            iConfig.getParameter<double>("particle_angres_param1"),
-            iConfig.getParameter<double>("particle_angres_param2"),
-            iConfig.getParameter<double>("opp_charge_penalty"),
-            iConfig.getParameter<double>("no_charge_penalty")) {}
+    jet_dR_threshold(iConfig.getParameter<double>("jet_dR_threshold")),
+    max_chisq(iConfig.getParameter<double>("max_chisq")),
+    particle_params() {
+
+    particle_params.setup_params(
+        PerFlavorMatchParams::ELE,
+        iConfig.getParameter<edm::ParameterSet>("Electrons")
+    );
+    particle_params.setup_params(
+        PerFlavorMatchParams::MU,
+        iConfig.getParameter<edm::ParameterSet>("Muons")
+    );
+    particle_params.setup_params(
+        PerFlavorMatchParams::HADCH,
+        iConfig.getParameter<edm::ParameterSet>("ChargedHadrons")
+    );
+}
 
 void matching::TrackMatcher::fillPSetDescription(edm::ParameterSetDescription& desc){
-    desc.add<std::string>("jet_dr_mode");
-    desc.add<double>("jet_dr_param1");
-    desc.add<double>("jet_dr_param2");
-    desc.add<double>("jet_dr_param3");
-    desc.add<std::string>("jet_ptres_mode");
-    desc.add<double>("jet_ptres_param1");
-    desc.add<double>("jet_ptres_param2");
-    desc.add<std::string>("jet_angres_mode");
-    desc.add<double>("jet_angres_param1");
-    desc.add<double>("jet_angres_param2");
-    desc.add<std::string>("particle_dr_mode");
-    desc.add<double>("particle_dr_param1");
-    desc.add<double>("particle_dr_param2");
-    desc.add<double>("particle_dr_param3");
-    desc.add<std::string>("particle_ptres_mode");
-    desc.add<double>("particle_ptres_param1");
-    desc.add<double>("particle_ptres_param2");
-    desc.add<std::string>("particle_angres_mode");
-    desc.add<double>("particle_angres_param1");
-    desc.add<double>("particle_angres_param2");
-    desc.add<double>("opp_charge_penalty");
-    desc.add<double>("no_charge_penalty");
+    desc.add<double>("jet_dR_threshold");
+    desc.add<double>("max_chisq");
+
+    edm::ParameterSetDescription ele_desc;
+    MatchParams::fillPSetDescription(ele_desc);
+    desc.add<edm::ParameterSetDescription>("Electrons", ele_desc);
+
+    edm::ParameterSetDescription mu_desc;
+    MatchParams::fillPSetDescription(mu_desc);
+    desc.add<edm::ParameterSetDescription>("Muons", mu_desc);
+
+    edm::ParameterSetDescription hadch_desc;
+    MatchParams::fillPSetDescription(hadch_desc);
+    desc.add<edm::ParameterSetDescription>("ChargedHadrons", hadch_desc);
 }
 #endif

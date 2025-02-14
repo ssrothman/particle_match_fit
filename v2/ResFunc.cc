@@ -17,6 +17,22 @@ private:
     const double res;
 };
 
+class ConstFracRes : public matching::ResFunc {
+public:
+    ConstFracRes(const double res,
+                 [[maybe_unused]] const double B) : res(res) {}
+
+    double evaluate(
+            const double pt, 
+            [[maybe_unused]] const double eta, 
+            [[maybe_unused]] const double phi, 
+            [[maybe_unused]] const int charge) const {
+        return res * pt;
+    }
+private:
+    const double res;
+};
+
 class TrackPtRes: public matching::ResFunc {
 public:
     TrackPtRes(const double A, const double B) : A(A), B(B) {}
@@ -53,6 +69,8 @@ matching::ResFuncPtr matching::ResFunc::get_resfunc(
 
     if (mode == "Const") {
         return std::make_unique<const ConstRes>(param1, param2);
+    } else if (mode == "ConstFrac") {
+        return std::make_unique<const ConstFracRes>(param1, param2);
     } else if (mode == "TrackPt") {
         return std::make_unique<const TrackPtRes>(param1, param2);
     } else if (mode == "TrackAng") {

@@ -2,8 +2,7 @@
 #define SROTHMAN_MATCHING_V2_TRACKMATCHER_H
 
 #include "SRothman/SimonTools/src/jet.h"
-#include "ChiSqFn.h"
-#include "DeltaRLimiter.h"
+#include "PerFlavorMatchParams.h"
 
 #include <string>
 #include <vector>
@@ -22,28 +21,60 @@ namespace matching {
 
     class TrackMatcher {
     public:
-        TrackMatcher(const std::string& jet_dr_mode,
-                     const double jet_dr_param1,
-                     const double jet_dr_param2,
-                     const double jet_dr_param3,
-                     const std::string& jet_ptres_mode,
-                     const double jet_ptres_param1,
-                     const double jet_ptres_param2,
-                     const std::string& jet_angres_mode,
-                     const double jet_angres_param1,
-                     const double jet_angres_param2,
-                     const std::string& particle_dr_mode,
-                     const double particle_dr_param1,
-                     const double particle_dr_param2,
-                     const double particle_dr_param3,
-                     const std::string& particle_ptres_mode,
-                     const double particle_ptres_param1,
-                     const double particle_ptres_param2,
-                     const std::string& particle_angres_mode,
-                     const double particle_angres_param1,
-                     const double particle_angres_param2,
-                     const double opp_charge_penalty,
-                     const double no_charge_penalty);
+        TrackMatcher(
+                //jet parameters
+                const double jet_dR_threshold,
+
+                //global params
+                const double max_chisq,
+
+                //electron params
+                const std::string& ele_dr_mode,
+                const double ele_dr_param1,
+                const double ele_dr_param2,
+                const double ele_dr_param3,
+                const std::string& ele_ptres_mode,
+                const double ele_ptres_param1,
+                const double ele_ptres_param2,
+                const std::string& ele_angres_mode,
+                const double ele_angres_param1,
+                const double ele_angres_param2,
+                const double ele_opp_charge_penalty,
+                const double ele_no_charge_penalty,
+                const std::string& ele_charge_filter_mode,
+                const std::string& ele_flavor_filter_mode,
+
+                //muon params
+                const std::string& mu_dr_mode,
+                const double mu_dr_param1,
+                const double mu_dr_param2,
+                const double mu_dr_param3,
+                const std::string& mu_ptres_mode,
+                const double mu_ptres_param1,
+                const double mu_ptres_param2,
+                const std::string& mu_angres_mode,
+                const double mu_angres_param1,
+                const double mu_angres_param2,
+                const double mu_opp_charge_penalty,
+                const double mu_no_charge_penalty,
+                const std::string& mu_charge_filter_mode,
+                const std::string& mu_flavor_filter_mode,
+
+                //charged hadron params
+                const std::string& hadch_dr_mode,
+                const double hadch_dr_param1,
+                const double hadch_dr_param2,
+                const double hadch_dr_param3,
+                const std::string& hadch_ptres_mode,
+                const double hadch_ptres_param1,
+                const double hadch_ptres_param2,
+                const std::string& hadch_angres_mode,
+                const double hadch_angres_param1,
+                const double hadch_angres_param2,
+                const double hadch_opp_charge_penalty,
+                const double hadch_no_charge_penalty,
+                const std::string& hadch_charge_filter_mode,
+                const std::string& hadch_flavor_filter_mode);
 
         void matchJets(
             const std::vector<simon::jet>& recojets,
@@ -62,11 +93,10 @@ namespace matching {
 #endif
 
     private:
-        const DeltaRLimiterPtr jet_dR_limiter;
-        const ChiSqFn jet_chisq_fn;
+        const double jet_dR_threshold;
+        const double max_chisq;
 
-        const DeltaRLimiterPtr particle_dR_limiter;
-        const ChiSqFn particle_chisq_fn;
+        PerFlavorMatchParams particle_params;
     };
 };
 
