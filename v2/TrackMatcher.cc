@@ -179,6 +179,7 @@ static void match_one_to_one(
             }
         }//end gen loop
         if(best_igen>=0 && best_chisq < max_chisq){
+            gen_used[best_igen] = true;
             matches.emplace_back(iReco, best_igen);
         }
     }//end reco loop
