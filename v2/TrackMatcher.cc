@@ -139,19 +139,20 @@ static void match_one_to_one(
                 return recovec[i1].pt > recovec[i2].pt;
             });
 
-    std::vector<bool> gen_used(genvec.size(), false);
+    std::vector<bool> reco_used(recovec.size(), false);
 
-    for(size_t iReco : reco_ptorder){
-        const auto& reco = recovec[iReco];
-        const auto& theparms = particle_params.get_params(reco);
+    for(size_t iGen : gen_ptorder){
+        const auto& gen = genvec[iGen];
         
         double best_chisq = INF;
-        int best_igen = -1;
+        int best_ireco = -1;
 
-        for(size_t iGen : gen_ptorder){
-            if(gen_used[iGen]) continue;
+        for(size_t iReco : reco_ptorder){
+            if(reco_used[iReco]) continue;
 
-            const auto& gen = genvec[iGen];
+            const auto& reco = recovec[iReco];
+
+            const auto& theparms = particle_params.get_params(reco);
 
             double dR = simon::deltaR(gen.eta, gen.phi,
                                      reco.eta, reco.phi);
@@ -175,12 +176,12 @@ static void match_one_to_one(
 
             if(chisq < best_chisq){
                 best_chisq = chisq;
-                best_igen = iGen;
+                best_ireco = iReco;
             }
         }//end gen loop
-        if(best_igen>=0 && best_chisq < max_chisq){
-            gen_used[best_igen] = true;
-            matches.emplace_back(iReco, best_igen);
+        if(best_ireco>=0 && best_chisq < max_chisq){
+            reco_used[best_ireco] = true;
+            matches.emplace_back(best_ireco, iGen);
         }
     }//end reco loop
 }//end match_one_to_one()
