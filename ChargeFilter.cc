@@ -1,4 +1,5 @@
 #include "ChargeFilter.h"
+#include <stdexcept>
 
 class ChargeMagnitudeFilter : public matching::ChargeFilter {
 public:

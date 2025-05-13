@@ -1,4 +1,5 @@
 #include "FlavorFilter.h"
+#include <stdexcept>
 
 class AnyFlavorFilter : public matching::FlavorFilter {
 public:
