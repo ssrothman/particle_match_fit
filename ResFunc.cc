@@ -41,7 +41,7 @@ public:
                     [[maybe_unused]] const double eta, 
                     [[maybe_unused]] const double phi,
                     [[maybe_unused]] const int charge) const {
-        return A + B * pt;
+        return pt * (A + B * pt);
     }
 private:
     const double A, B;
